@@ -17,6 +17,7 @@ from ..logger import get_logger
 from ..config import app1_config
 from .audio_extractor import extract_audio, cleanup_audio, AudioExtractionError
 from .transcriber import transcribe_to_srt, TranscriptionError
+from .subtitle_extractor import try_extract_embedded_subtitles
 
 log = get_logger(__name__, level=app1_config.log_level)
 
@@ -77,6 +78,20 @@ class FileProcessor:
         log.info("=" * 60)
         log.info("Feldolgozás kezdete: '%s'", video_path.name)
         log.info("=" * 60)
+
+        # 0. lépés: Beágyazott feliratok vizsgálata és gyorskinyerése (100x gyorsulás)
+        if app1_config.extract_embedded_subs:
+            try:
+                emb_srt, is_hu = try_extract_embedded_subtitles(video_path)
+                if emb_srt:
+                    self._mark_as_processed(video_path)
+                    if is_hu:
+                        log.info("🎉 Beágyazott MAGYAR felirat kinyerve: '%s'. A videó kész!", emb_srt.name)
+                    else:
+                        log.info("⚡ Beágyazott felirat kinyerve: '%s'. Whisper átugorva, kész a fordításra!", emb_srt.name)
+                    return emb_srt
+            except Exception as exc:
+                log.warning("Hiba a beágyazott felirat vizsgálatakor, fallback Whisperre: %s", exc)
 
         audio_path: Path | None = None
         try:

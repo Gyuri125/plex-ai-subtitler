@@ -1,0 +1,25 @@
+version: "3.8"
+
+services:
+  plex-subtitler:
+    build: .
+    container_name: plex-ai-subtitler
+    restart: unless-stopped
+    volumes:
+      # Csatold a meglévő film és sorozat könyvtáraidat:
+      - /path/to/your/media:/media:rw
+      # Konfigurációs fájl csatolása a hostról:
+      - ./settings.json:/app/plex_subtitler/settings.json:rw
+      - ./processed_files.log:/app/plex_subtitler/processed_files.log:rw
+    environment:
+      - TZ=Europe/Budapest
+      - PYTHONUNBUFFERED=1
+
+    # --- Opcionális NVIDIA GPU gyorsítás (Unraid / Docker GPU runtime) ---
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]

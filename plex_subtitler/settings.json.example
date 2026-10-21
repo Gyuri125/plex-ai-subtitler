@@ -15,7 +15,13 @@
         "watchdog_poll_interval": 5,
         "processed_log": "./processed_files.log",
         "cleanup_audio": true,
-        "log_level": "INFO"
+        "log_level": "INFO",
+        "extract_embedded_subs": true,
+        "embedded_sub_languages": [
+            "eng",
+            "en"
+        ],
+        "minimize_to_tray": true
     },
     "app2": {
         "llm_provider": "google",
@@ -26,6 +32,15 @@
         "target_language": "Hungarian",
         "translation_style_hint": "Use natural, colloquial language as used in Hungarian movie dubbing.",
         "api_request_delay": 0.5,
-        "log_level": "INFO"
+        "log_level": "INFO",
+        "use_sliding_context": true,
+        "sliding_context_size": 4,
+        "plex_auto_refresh": false,
+        "plex_url": "http://localhost:32400",
+        "plex_token": "",
+        "notifications_enabled": false,
+        "discord_webhook_url": "",
+        "telegram_bot_token": "",
+        "telegram_chat_id": ""
     }
 }

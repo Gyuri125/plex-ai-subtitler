@@ -1,0 +1,17 @@
+.git/
+.venv/
+venv/
+env/
+.idea/
+.vscode/
+dist/
+build/
+__pycache__/
+*.py[cod]
+temp_audio/
+*.log
+*.mkv
+*.mp4
+*.wav
+*.mp3
+*.srt

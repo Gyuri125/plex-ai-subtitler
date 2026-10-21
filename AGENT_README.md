@@ -27,10 +27,15 @@ Gemini-AI_plexfordító/
 ├── README.md                    # Nyilvános GitHub dokumentáció (magyar/angol)
 ├── AGENT_README.md              # ← EZ A DOKUMENTUM: Fejlesztői és ágens útmutató
 ├── PlexSubtitler.spec           # PyInstaller bináris csomagoló specifikáció
+├── build_exe.bat                # Automata Git-pull és Exe fordító/frissítő script
+├── inditas.bat                  # Duplakattintásos indító konzolablak nélkül
+├── Dockerfile                   # Headless konténer Unraid/NAS szerverekhez
+├── docker-compose.yml           # Docker Compose konfiguráció
 │
 └── plex_subtitler/              # Fő Python csomag
     ├── config.py                # Konfigurációkezelő (SettingsManager singleton, JSON perzisztencia)
     ├── logger.py                # Színezett konzolos és fájl logging
+    ├── notifier.py              # Plex Auto-Refresh API hívások és Discord/Telegram értesítések
     ├── settings.json            # [GITIGNORED] Felhasználó helyi beállításai és API kulcsai
     ├── processed_files.log      # [GITIGNORED] MD5 ujjlenyomat napló a duplikáció elkerülésére
     ├── temp_audio/              # [GITIGNORED] Ideiglenes 16kHz mono WAV audio kinyerések
@@ -38,9 +43,10 @@ Gemini-AI_plexfordító/
     ├── app1_extractor/          # 1. FÁZIS: Mappafigyelés + FFmpeg + faster-whisper
     │   ├── __init__.py
     │   ├── main.py              # Fő belépési pont (GUI indító vagy CLI argumentum parser)
-    │   ├── gui.py               # CustomTkinter Dark Mode GUI (fül-alapú vezérlés, LogBox)
+    │   ├── gui.py               # CustomTkinter Dark Mode GUI (Tray ikon, integrációk)
     │   ├── watcher.py           # Watchdog daemon, fájlméret-stabilitás ellenőrzés
     │   ├── file_processor.py    # Pipeline orkesztrátor, MD5 ellenőrzés, fájltakarítás
+    │   ├── subtitle_extractor.py# Beágyazott feliratok szondázása és 0.5s kinyerése
     │   ├── audio_extractor.py   # FFmpeg hívás (imageio-ffmpeg vagy rendszer bináris)
     │   ├── transcriber.py       # faster-whisper STT motor, VAD és SRT időzítés
     │   └── hardware_manager.py  # PyTorch CUDA & VRAM vizsgálat, dinamikus Whisper profilozó
@@ -49,7 +55,7 @@ Gemini-AI_plexfordító/
         ├── __init__.py
         ├── translator_daemon.py # SRT mappafigyelő és fordítási munkaszál koordinátor
         ├── srt_parser.py        # SRT blokk értelmező, 30-as csomagoló és visszamásoló
-        └── llm_client.py        # LLM Factory (Gemini, OpenAI, Ollama), retry és backoff logika
+        └── llm_client.py        # LLM Factory (Gemini, OpenAI, Ollama), Sliding Context, retry logika
 ```
 
 ---

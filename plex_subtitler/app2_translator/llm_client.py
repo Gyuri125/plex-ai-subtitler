@@ -28,6 +28,7 @@ Rules you MUST follow strictly:
 4. Keep the text concise to fit on a screen (avoid overly long explanations).
 5. If you see ' \\n ' in the text, it means a line break in the subtitle. Keep it or adjust it so the subtitle remains readable on screen (max 2 lines per block).
 6. DO NOT add any extra conversational text (like "Here is the translation"). ONLY return the translated blocks.
+7. If previous context is provided under '[PREVIOUS SCENE CONTEXT]', use it strictly to maintain narrative tone, consistency, pronouns, and polite/informal address (tegezés/magázódás in Hungarian). DO NOT re-translate or output the context lines! ONLY translate the lines under '[BLOCKS TO TRANSLATE]'.
 
 Additional instructions: {style_hint}
 """
@@ -44,7 +45,7 @@ class LLMClientBase(ABC):
         )
 
     @abstractmethod
-    def translate_chunk(self, chunk_text: str) -> str:
+    def translate_chunk(self, chunk_text: str, context_text: str = "") -> str:
         """Lefordítja a kapott szövegblokkot."""
         pass
 
@@ -71,10 +72,17 @@ class OpenAIClient(LLMClientBase):
             
         self.client = OpenAI(**kwargs)
 
-    def translate_chunk(self, chunk_text: str) -> str:
+    def translate_chunk(self, chunk_text: str, context_text: str = "") -> str:
+        user_content = chunk_text
+        if context_text.strip():
+            user_content = (
+                f"[PREVIOUS SCENE CONTEXT (DO NOT TRANSLATE)]:\n{context_text.strip()}\n\n"
+                f"[BLOCKS TO TRANSLATE]:\n{chunk_text}"
+            )
+
         messages = [
             {"role": "system", "content": self.system_prompt},
-            {"role": "user", "content": chunk_text}
+            {"role": "user", "content": user_content}
         ]
         
         try:
@@ -106,13 +114,20 @@ class GeminiClient(LLMClientBase):
         self.client = genai.Client(api_key=api_key)
         self.model_name = app2_config.llm_model
 
-    def translate_chunk(self, chunk_text: str) -> str:
+    def translate_chunk(self, chunk_text: str, context_text: str = "") -> str:
+        user_content = chunk_text
+        if context_text.strip():
+            user_content = (
+                f"[PREVIOUS SCENE CONTEXT (DO NOT TRANSLATE)]:\n{context_text.strip()}\n\n"
+                f"[BLOCKS TO TRANSLATE]:\n{chunk_text}"
+            )
+
         try:
             from google.genai import types
             
             response = self.client.models.generate_content(
                 model=self.model_name,
-                contents=chunk_text,
+                contents=user_content,
                 config=types.GenerateContentConfig(
                     system_instruction=self.system_prompt,
                     temperature=0.3,
@@ -138,7 +153,7 @@ def get_llm_client() -> LLMClientBase:
         log.warning(f"Ismeretlen provider: '{provider}', fallback OpenAI-ra.")
         return OpenAIClient()
 
-def translate_blocks_with_retry(client: LLMClientBase, chunk_text: str, retries: int = 15, stop_event=None) -> str:
+def translate_blocks_with_retry(client: LLMClientBase, chunk_text: str, context_text: str = "", retries: int = 15, stop_event=None) -> str:
     """Megkísérli lefordítani a blokkot, hiba esetén újrapróbálkozik."""
     import re
     attempt = 1
@@ -148,7 +163,7 @@ def translate_blocks_with_retry(client: LLMClientBase, chunk_text: str, retries:
             
         try:
             time.sleep(app2_config.api_request_delay)
-            result = client.translate_chunk(chunk_text)
+            result = client.translate_chunk(chunk_text, context_text=context_text)
             return result
         except Exception as e:
             err_msg = str(e).lower()

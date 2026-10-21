@@ -7,7 +7,9 @@
 [![STT Engine](https://img.shields.io/badge/STT-faster--whisper-orange?logo=openai&logoColor=white)](https://github.com/SYSTRAN/faster-whisper)
 [![LLM Translation](https://img.shields.io/badge/LLM-Gemini%20%7C%20OpenAI%20%7C%20Ollama-7852FF?logo=google-gemini&logoColor=white)](https://ai.google.dev/)
 [![GUI](https://img.shields.io/badge/GUI-CustomTkinter%20Dark-1f538d?logo=tkinter&logoColor=white)](https://github.com/TomSchimansky/CustomTkinter)
-[![Plex](https://img.shields.io/badge/Plex-Native%20Compatible-E5A00D?logo=plex&logoColor=white)](https://www.plex.tv/)
+[![System Tray](https://img.shields.io/badge/Tray-pystray-2ea44f?logo=windows&logoColor=white)](#-windows-system-tray)
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)](#-docker--nas-support-unraid-truenas-synology)
+[![Plex](https://img.shields.io/badge/Plex-Native%20Auto--Refresh-E5A00D?logo=plex&logoColor=white)](https://www.plex.tv/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![GitHub Repo](https://img.shields.io/badge/GitHub-Gyuri125%2Fplex--ai--subtitler-181717?logo=github&logoColor=white)](https://github.com/Gyuri125/plex-ai-subtitler)
 
@@ -18,7 +20,7 @@
 <br />
 
 <p align="center">
-  <b>Plex AI Subtitler</b> is a robust, production-grade automation daemon that monitors your media library, extracts audio from videos using FFmpeg, generates high-accuracy timestamps via <code>faster-whisper</code>, and translates subtitles into natural, cinematic Hungarian using modern LLMs (Google Gemini, OpenAI, or local Ollama).
+  <b>Plex AI Subtitler</b> is a robust, production-grade automation daemon that monitors your media library, extracts existing embedded subtitles in seconds (or transcribes audio via <code>faster-whisper</code>), translates subtitles into natural, cinematic Hungarian using modern LLMs (Google Gemini, OpenAI, or local Ollama) with <b>Sliding Context</b>, triggers <b>Plex Auto-Refresh</b>, and sends push notifications to <b>Discord</b> or <b>Telegram</b>.
 </p>
 
 </div>
@@ -30,44 +32,42 @@
 <table>
   <tr>
     <td width="50%">
-      <h3>🎙️ Stage 1: Audio Extractor & Whisper STT</h3>
+      <h3>⚡ Stage 1: Fast Extraction & Whisper STT</h3>
       <ul>
-        <li><b>Folder Watchdog:</b> Monitors movie and TV folders continuously.</li>
+        <li><b>100× Fast Embedded Subtitle Extraction:</b> Automatically probes <code>.mkv</code>/<code>.mp4</code> containers for existing English (or Hungarian) subtitles. If found, extracts them in 0.5s and skips Whisper!</li>
+        <li><b>Hardware Auto-Tuning Whisper:</b> If no subtitle is embedded, auto-detects CUDA/VRAM and transcribes with optimal model (<code>small</code>, <code>medium</code>, <code>large-v3</code>).</li>
         <li><b>File Stabilization:</b> Verifies torrents or copies are 100% finished before processing.</li>
-        <li><b>Hardware Auto-Tuning:</b> Automatically detects NVIDIA CUDA / VRAM and selects optimal Whisper model (<code>small</code>, <code>medium</code>, <code>large-v3</code>).</li>
         <li><b>Deduplication:</b> MD5-based fingerprint tracking in <code>processed_files.log</code> prevents re-processing.</li>
-        <li><b>Zero Junk Files:</b> Automatically cleans up temporary WAV files after transcription.</li>
+        <li><b>Zero Junk Files:</b> Automatically cleans up temporary WAV files.</li>
       </ul>
     </td>
     <td width="50%">
       <h3>🤖 Stage 2: AI Subtitle Translator</h3>
       <ul>
+        <li><b>Sliding Context Window:</b> Feeds previous translated lines into the next chunk prompt, preserving continuous narrative tone, character gender, and pronoun consistency (tegezés/önözés).</li>
         <li><b>Cinematic Prompting:</b> Preserves tone, slang, character idioms, and colloquialisms for dubbing quality.</li>
         <li><b>Multi-Provider:</b> Native support for <b>Google Gemini</b> (Flash / Pro), <b>OpenAI</b> (GPT-4o-mini), and <b>Local Ollama</b> (Llama 3 / Mistral).</li>
-        <li><b>Resilient Batching:</b> Chunking engine preserves SRT indices, timestamps, and line breaks without drift.</li>
         <li><b>Rate-Limit Protection:</b> Intelligent retry mechanism with exponential backoff and HTTP 429 quota waiting.</li>
-        <li><b>Partial Progress Saving:</b> Never lose translated blocks on unexpected shutdowns.</li>
       </ul>
     </td>
   </tr>
   <tr>
     <td width="50%">
-      <h3>🎨 Modern Dark-Mode GUI</h3>
+      <h3>🎨 Modern Dark GUI & System Tray</h3>
       <ul>
-        <li>Built with <b>CustomTkinter</b> for a sleek, responsive experience.</li>
-        <li>One-click Hardware Optimization & Auto-Profile fallback.</li>
-        <li>Live thread-safe LogBox with real-time status updates.</li>
-        <li>Manual one-file extraction and translation testing.</li>
+        <li>Built with <b>CustomTkinter</b> Dark Mode.</li>
+        <li><b>Windows System Tray:</b> Minimizes to tray on close, running smoothly in the background.</li>
         <li>Interactive model discovery directly querying available Gemini / OpenAI / Ollama models.</li>
+        <li>Live thread-safe LogBox with real-time status updates.</li>
+        <li>One-click manual file processing.</li>
       </ul>
     </td>
     <td width="50%">
-      <h3>📺 100% Plex Server Integration</h3>
+      <h3>📺 Integrations & Push Notifications</h3>
       <ul>
-        <li>Outputs sidecar <code>.srt</code> files directly next to video files.</li>
-        <li>Generates primary audio subtitle (<code>movie.srt</code> / <code>movie.en.srt</code>).</li>
-        <li>Generates localized target subtitle (<code>movie.hu.srt</code>).</li>
-        <li><b>Zero Plex plugins required:</b> Plex Media Server instantly and natively detects external subtitles.</li>
+        <li><b>Plex Auto-Refresh:</b> Calls the Plex API (<code>/library/sections/all/refresh</code>) as soon as the subtitle is ready so it appears in the player instantly!</li>
+        <li><b>Discord & Telegram Alerts:</b> Receive instant push notifications on your phone with translation duration and block statistics.</li>
+        <li><b>Sidecar Naming:</b> Generates <code>movie.srt</code> and <code>movie.hu.srt</code> for 100% native Plex compatibility.</li>
       </ul>
     </td>
   </tr>
@@ -83,9 +83,11 @@ flowchart TD
         Video["🎬 New Video Added\n(.mkv / .mp4)"]
     end
 
-    subgraph App1 [" 🎙️ App 1: Audio Extractor & STT "]
+    subgraph App1 [" 🎙️ App 1: Extractor & STT "]
         Watch["📁 Watchdog Daemon\n(File size stability check)"]
         Dedup{"🔍 Hashes checked\nin processed log?"}
+        Probe{"⚡ Embedded subtitle\nalready present?"}
+        FastSub["⏩ Instant Subtitle Extract\n(0.5 sec, skips Whisper!)"]
         FFmpeg["⚙️ FFmpeg\n(16kHz Mono WAV extraction)"]
         Whisper["🧠 faster-whisper\n(VAD filtering + STT)"]
         Clean["🧹 Cleanup Temp Audio"]
@@ -95,29 +97,38 @@ flowchart TD
     subgraph App2 [" 🤖 App 2: AI Translator Agent "]
         WatchSRT["📁 SRT Watchdog\n(Detects new .srt)"]
         Chunker["✂️ SRT Chunker & Tokenizer\n(30 blocks per batch)"]
+        Context["🧠 Sliding Context\n(Last 4 translated lines injected)"]
         LLM["🌐 LLM API\n(Gemini / OpenAI / Ollama)\nCinematic Dubbing System Prompt"]
         Reconstruct["📝 Srt Rebuilder\n(Timestamps + Formatting)"]
         SrtHU["🇭🇺 film.hu.srt (Hungarian)"]
     end
 
-    subgraph PlexServer [" 📺 Plex Media Server "]
-        Plex["🍿 Plex detects & pairs subtitles\nNo transcoding needed!"]
+    subgraph Integrations [" 📡 Integrations "]
+        PlexRefresh["📺 Plex API Auto-Refresh\n(Instant subtitle pickup)"]
+        Notif["🔔 Discord & Telegram Webhook\n(Push Notification)"]
+        Plex["🍿 Plex Player\nReady to watch!"]
     end
 
     Video --> Watch
     Watch --> Dedup
-    Dedup -- No --> FFmpeg
+    Dedup -- No --> Probe
     Dedup -- Already processed --> Skip["⏭️ Skip"]
+    Probe -- "Yes (eng/en)" --> FastSub
+    Probe -- "Yes (hun/hu)" --> SrtHU
+    FastSub --> SrtEN
+    Probe -- "No subtitle" --> FFmpeg
     FFmpeg --> Whisper
     Whisper --> Clean
     Whisper --> SrtEN
     SrtEN --> WatchSRT
     WatchSRT --> Chunker
-    Chunker --> LLM
+    Chunker --> Context
+    Context --> LLM
     LLM --> Reconstruct
     Reconstruct --> SrtHU
-    SrtEN --> Plex
-    SrtHU --> Plex
+    SrtHU --> PlexRefresh
+    SrtHU --> Notif
+    PlexRefresh --> Plex
 ```
 
 ---
@@ -182,144 +193,71 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-> **Tip for NVIDIA GPU users:** If you have CUDA installed, enable GPU Whisper acceleration via:
-> ```bash
-> pip install torch --index-url https://download.pytorch.org/whl/cu121
-> ```
+### 3. Launching
 
-### 3. Configuration
-
-Copy the example configuration file:
-
-```bash
-# Windows
-copy settings.json.example plex_subtitler\settings.json
-
-# Linux / macOS
-cp settings.json.example plex_subtitler/settings.json
-```
-
-Edit `plex_subtitler/settings.json` or configure everything visually in the GUI:
-
-```json
-{
-    "app1": {
-        "watch_dirs": [
-            "D:/Media/Movies",
-            "D:/Media/TV Shows"
-        ],
-        "temp_audio_dir": "./temp_audio",
-        "ffmpeg_path": "ffmpeg",
-        "whisper_model": "small",
-        "whisper_device": "cpu",
-        "whisper_compute_type": "int8"
-    },
-    "app2": {
-        "llm_provider": "google",
-        "llm_api_key": "YOUR_GEMINI_API_KEY",
-        "llm_model": "gemini-1.5-flash",
-        "target_language": "Hungarian",
-        "translation_batch_size": 30
-    }
-}
-```
+- **Double-click:** Run [`inditas.bat`](file:///inditas.bat) to launch the GUI instantly without opening a black command prompt.
+- **Command Line:**
+  ```bash
+  python -m plex_subtitler.app1_extractor.main
+  ```
 
 ---
 
-## 🖥️ Usage
+## 🛠️ Automated Exe Compiler & Updater (`build_exe.bat`)
 
-### Option A: Launch GUI (Default)
+The repository includes a smart, one-click Windows build script: [`build_exe.bat`](file:///build_exe.bat).
 
-```bash
-python -m plex_subtitler.app1_extractor.main
-```
+**What it does automatically:**
+1. Runs `git pull origin main` to pull the latest version from GitHub.
+2. Updates and installs dependencies (`requirements.txt` and `pyinstaller`).
+3. Closes any running instances of `PlexSubtitler.exe`.
+4. Compiles the standalone executable via PyInstaller and overwrites the previous version.
+5. Offers to launch the newly built app immediately!
 
-- Click **"Hardver vizsgálata & Auto profil"** to detect CUDA and auto-tune Whisper.
-- Set your watched media directory.
-- Enter your Gemini or OpenAI API Key (or select Ollama for 100% free local translation).
-- Click **"Mappafigyelő Indítása"** to start the continuous background daemon.
-
-### Option B: Headless / CLI Daemon (Servers / NAS)
-
-Ideal for Docker, Unraid, TrueNAS, or headless Linux/Windows servers:
-
-```bash
-# Run continuous watcher daemon
-python -m plex_subtitler.app1_extractor.main --cli
-
-# Scan existing unprocessed files on start
-python -m plex_subtitler.app1_extractor.main --cli --scan-existing
-
-# Process a single movie file and exit (Test mode)
-python -m plex_subtitler.app1_extractor.main --once "C:/Media/Movies/Sample.mkv"
-```
+To use it, simply **double-click `build_exe.bat`** in the project folder!
 
 ---
 
-## 🤖 Supported LLM Providers
+## 🐳 Docker & NAS Support (Unraid, TrueNAS, Synology)
 
-| Provider | Recommended Model | Speed | Cost | Notes |
-| :--- | :--- | :--- | :--- | :--- |
-| **Google Gemini** *(Recommended)* | `gemini-1.5-flash` / `gemini-2.0-flash` | Ultra-Fast | Free tier / Extremely Cheap | Exceptional Hungarian dubbing context, high rate limits. |
-| **OpenAI** | `gpt-4o-mini` | Very Fast | Low | High fidelity, great translation consistency. |
-| **Ollama (Local)** | `llama3:8b`, `mistral`, `qwen2.5` | Fast (GPU) | **100% Free** | Runs entirely offline on your local hardware. |
-
----
-
-## 📦 Standalone Windows Executable (.exe)
-
-You can build a standalone, one-click Windows executable with PyInstaller:
+Run headless on your home server or NAS with `docker-compose`:
 
 ```bash
-pip install pyinstaller
-pyinstaller PlexSubtitler.spec
+# Start container
+docker-compose up -d
 ```
 
-The output executable will be created in `dist/PlexSubtitler/PlexSubtitler.exe`.
+Example `docker-compose.yml`:
+```yaml
+version: "3.8"
+services:
+  plex-subtitler:
+    build: .
+    container_name: plex-ai-subtitler
+    restart: unless-stopped
+    volumes:
+      - /mnt/user/data/media:/media:rw
+      - ./settings.json:/app/plex_subtitler/settings.json:rw
+      - ./processed_files.log:/app/plex_subtitler/processed_files.log:rw
+```
 
 ---
 
 ## 🇭🇺 Magyar Dokumentáció és Gyorsútmutató
 
-### Mi ez a projekt?
-A **Plex AI Subtitler** egy kétszintű, teljesen automatizált felirat-előállító és fordító rendszer:
-1. **1. Fázis (Extractor & STT):** Folyamatosan figyeli a Plex film- és sorozat-mappáit. Amikor új videó érkezik, az FFmpeg segítségével kinyeri a hangsávot, a `faster-whisper` neurális hálóval feliratot generál eredeti nyelven (angol `.srt`), majd azonnal törli az ideiglenes hangfájlt.
-2. **2. Fázis (AI Translator):** Észleli az új `.srt` fájlokat, 30 blokkos csomagokra bontja azokat, és mesterséges intelligenciával (Google Gemini, OpenAI vagy lokális Ollama) természetes hangzású, szinkron-stílusú magyar felirattá (`.hu.srt`) fordítja.
-3. **Plex Kész Eredmény:** A Plex Media Server automatikusan, átkódolás nélkül felismeri és megjeleníti a feliratokat.
-
-### Gyors beüzemelés:
-1. Klónozd a tárat: `git clone https://github.com/Gyuri125/plex-ai-subtitler.git`
-2. Virtuális környezet és függőségek:
-   ```bash
-   python -m venv .venv
-   .venv\Scripts\activate
-   pip install -r requirements.txt
-   ```
-3. Indítás:
-   ```bash
-   python -m plex_subtitler.app1_extractor.main
-   ```
-4. A grafikus felületen add meg a figyelendő mappát, az API kulcsodat (pl. Google Gemini Flash), kattints az automatikus hardverbeállításra, majd nyomd meg a **"Mappafigyelő Indítása"** gombot.
-
-További mélyreható fejlesztői és architektúrális részletekért olvasd el az **[AGENT_README.md](AGENT_README.md)** fájlt!
-
----
-
-## 🔒 Security & Privacy
-
-- **Never Commit Secrets:** `settings.json`, `.env`, és minden API kulcs alapértelmezetten szerepel a `.gitignore`-ban.
-- **Local Data Only:** A médiafájlok és ideiglenes audiók soha nem hagyják el a gépedet. Csak a szöveges feliratsorok kerülnek továbbításra a választott fordító API felé (vagy ha Ollamát használsz, még azok sem).
-
----
-
-## 🤝 Contributing
-
-Contributions, bug reports, and feature requests are welcome!
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+### Főbb Új Funkciók:
+1. **⚡ Beágyazott feliratok kinyerése (100×-os gyorsulás):**
+   Ha az `.mkv` vagy `.mp4` videóban már létezik angol felirat, a program 0.5 másodperc alatt kinyeri és kihagyja a hosszú Whisper feldolgozást! Ha magyar felirat is van benne, azonnal elmenti és késznek nyilvánítja a filmet.
+2. **🧠 Gördülő kontextus-ablak (Sliding Context):**
+   Minden fordítási blokknál átadja az előző jelenet utolsó 3-4 mondatát, így az LLM pontosan tudja a szereplők nemét és tegezési/magázódási viszonyát.
+3. **📡 Automatikus Plex Könyvtárfrissítés:**
+   Amint elkészül a felirat, a program a Plex API-n keresztül azonnal frissíti a könyvtárat, így a felirat azonnal kattintható a tévén vagy mobilon.
+4. **📌 Rendszertálca (System Tray):**
+   A program a jobb felső "X" gombbal a Windows óra mellé rejthető, és a háttérben figyeli a mappákat.
+5. **🔔 Discord és Telegram Értesítések:**
+   Push üzenetet kapsz a telefonodra, amikor elkészül egy új film magyar felirata.
+6. **🛠️ Egykattintásos Exe Frissítő (`build_exe.bat`):**
+   Automatikusan letölti a legújabb verziót a GitHubról és lefordítja az új exe-t felülírva a régit!
 
 ---
 

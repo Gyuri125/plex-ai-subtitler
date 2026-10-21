@@ -44,6 +44,10 @@ class App1Config:
     processed_log: str = str(ROOT_DIR / "processed_files.log")
     cleanup_audio: bool = True
     log_level: str = "INFO"
+    # --- Beágyazott feliratok & UX ---
+    extract_embedded_subs: bool = True
+    embedded_sub_languages: list[str] = field(default_factory=lambda: ["eng", "en"])
+    minimize_to_tray: bool = True
 
 
 @dataclass
@@ -58,6 +62,21 @@ class App2Config:
     translation_style_hint: str = "Use natural, colloquial language as used in Hungarian movie dubbing."
     api_request_delay: float = 0.5
     log_level: str = "INFO"
+
+    # --- Kontextus-megőrzés (Sliding Context) ---
+    use_sliding_context: bool = True
+    sliding_context_size: int = 4
+
+    # --- Plex Integráció (Auto-Refresh) ---
+    plex_auto_refresh: bool = False
+    plex_url: str = "http://localhost:32400"
+    plex_token: str = ""
+
+    # --- Értesítések (Discord / Telegram) ---
+    notifications_enabled: bool = False
+    discord_webhook_url: str = ""
+    telegram_bot_token: str = ""
+    telegram_chat_id: str = ""
 
 
 class SettingsManager:

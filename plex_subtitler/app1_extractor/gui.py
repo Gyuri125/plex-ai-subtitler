@@ -17,6 +17,14 @@ from plex_subtitler.app1_extractor.watcher import WatcherDaemon
 from plex_subtitler.app1_extractor.hardware_manager import HardwareManager
 from plex_subtitler.app1_extractor.file_processor import FileProcessor
 from plex_subtitler.app2_translator.translator_daemon import TranslatorDaemon
+from plex_subtitler.notifier import refresh_plex_library, send_discord_notification, send_telegram_notification
+
+try:
+    import pystray
+    from PIL import Image, ImageDraw
+    HAS_TRAY = True
+except ImportError:
+    HAS_TRAY = False
 
 log = get_logger("GUI", level="INFO")
 
@@ -92,7 +100,7 @@ class PlexSubtitlerApp(ctk.CTk):
         super().__init__()
 
         self.title("Plex Subtitler - Extractor & Translator")
-        self.geometry("700x800")
+        self.geometry("740x840")
         self.resizable(False, False)
         
         ctk.set_appearance_mode("dark")
@@ -100,10 +108,13 @@ class PlexSubtitlerApp(ctk.CTk):
         
         self.extractor_daemon = None
         self.translator_daemon = None
+        self.tray_icon = None
         
         self._build_ui()
         self._load_settings_to_ui()
         self._setup_gui_logger()
+        self._init_tray()
+        self.protocol("WM_DELETE_WINDOW", self._on_window_close)
 
     def _setup_gui_logger(self):
         gui_handler = GuiLogHandler(self.log_box)
@@ -123,15 +134,17 @@ class PlexSubtitlerApp(ctk.CTk):
         self.title_label.pack(pady=(5, 10))
         
         # Fülek (Tabs)
-        self.tabview = ctk.CTkTabview(self.main_frame, height=350)
+        self.tabview = ctk.CTkTabview(self.main_frame, height=390)
         self.tabview.pack(fill="x", padx=10, pady=5)
         
         self.tab_extractor = self.tabview.add("1. Audio Extractor")
         self.tab_translator = self.tabview.add("2. AI Translator")
-        self.tab_help = self.tabview.add("3. Súgó")
+        self.tab_integrations = self.tabview.add("3. Integrációk")
+        self.tab_help = self.tabview.add("4. Súgó")
         
         self._build_extractor_tab()
         self._build_translator_tab()
+        self._build_integrations_tab()
         self._build_help_tab()
         
         # Közös LogBox Szekció
@@ -182,6 +195,26 @@ class PlexSubtitlerApp(ctk.CTk):
         ctk.CTkLabel(wh_frame, text="Nagyobb modell = pontosabb felirat, de több memóriát (VRAM) igényel.", font=ctk.CTkFont(size=11), text_color="gray").grid(row=2, column=0, columnspan=2, padx=10, pady=(0, 5), sticky="w")
         ctk.CTkLabel(wh_frame, text="int8: Gyengébb gépekre / fp16: Dedikált GPU-ra.", font=ctk.CTkFont(size=11), text_color="gray").grid(row=2, column=2, columnspan=2, padx=10, pady=(0, 5), sticky="w")
         
+        # Extra opciók (Beágyazott felirat és Rendszertálca)
+        extra_opt_frame = ctk.CTkFrame(self.tab_extractor, fg_color="transparent")
+        extra_opt_frame.pack(fill="x", padx=5, pady=(0, 5))
+        
+        self.chk_embedded_subs = ctk.CTkCheckBox(
+            extra_opt_frame, 
+            text="⚡ Beágyazott feliratok kinyerése (100× gyorsulás)", 
+            command=self._on_setting_changed
+        )
+        self.chk_embedded_subs.pack(side="left", padx=5)
+        ToolTip(self.chk_embedded_subs, "Ha a letöltött videóban már van angol felirat, 0.5 mp alatt kinyeri és kihagyja a Whispert.")
+        
+        self.chk_minimize_tray = ctk.CTkCheckBox(
+            extra_opt_frame, 
+            text="📌 Tálcára rejtés bezáráskor", 
+            command=self._on_setting_changed
+        )
+        self.chk_minimize_tray.pack(side="right", padx=5)
+        ToolTip(self.chk_minimize_tray, "Az ablak bezárásakor a program a háttérben fut tovább a Windows tálcaikonján.")
+
         # Vezérlő gombok
         ctrl_frame = ctk.CTkFrame(self.tab_extractor, fg_color="transparent")
         ctrl_frame.pack(fill="x", pady=10)
@@ -250,6 +283,14 @@ class PlexSubtitlerApp(ctk.CTk):
         self.batch_size_label.grid(row=0, column=1, padx=(5, 0), sticky="e")
         ToolTip(self.batch_size_slider, "Hány sor menjen egyszerre az API-nak. Túl nagy = elcsúszhat, Túl kicsi = nincs kontextus. (Ajánlott: 30)")
         
+        self.chk_sliding_context = ctk.CTkCheckBox(
+            trans_frame,
+            text="🧠 Gördülő kontextus-ablak (Sliding Context)",
+            command=self._on_setting_changed
+        )
+        self.chk_sliding_context.grid(row=2, column=0, columnspan=2, padx=10, pady=(5, 5), sticky="w")
+        ToolTip(self.chk_sliding_context, "Átadja az előző blokkok lefordított sorait az LLM-nek a konzisztens szinkronhangnem és tegezés/önözés érdekében.")
+        
         trans_frame.columnconfigure(1, weight=1)
 
         # Vezérlő gombok
@@ -280,19 +321,90 @@ class PlexSubtitlerApp(ctk.CTk):
         self.tr_progress_bar.pack(fill="x", pady=(5, 0))
         self.tr_progress_bar.set(0)
 
+    def _build_integrations_tab(self):
+        # Plex Szerver integráció
+        plex_frame = ctk.CTkFrame(self.tab_integrations)
+        plex_frame.pack(fill="x", padx=10, pady=10, ipadx=5, ipady=5)
+
+        self.chk_plex_refresh = ctk.CTkCheckBox(
+            plex_frame, 
+            text="📡 Automatikus Plex könyvtárfrissítés (Auto-Refresh)", 
+            command=self._on_setting_changed
+        )
+        self.chk_plex_refresh.pack(anchor="w", padx=10, pady=(5, 5))
+        ToolTip(self.chk_plex_refresh, "Ha be van kapcsolva, a .hu.srt elkészültekor a Plex azonnal észleli a feliratot.")
+
+        p_row1 = ctk.CTkFrame(plex_frame, fg_color="transparent")
+        p_row1.pack(fill="x", padx=10, pady=2)
+        ctk.CTkLabel(p_row1, text="Plex URL:", width=110, anchor="w").pack(side="left")
+        self.plex_url_entry = ctk.CTkEntry(p_row1, placeholder_text="http://localhost:32400")
+        self.plex_url_entry.pack(side="left", fill="x", expand=True)
+        self.plex_url_entry.bind("<KeyRelease>", self._on_setting_changed)
+
+        p_row2 = ctk.CTkFrame(plex_frame, fg_color="transparent")
+        p_row2.pack(fill="x", padx=10, pady=2)
+        ctk.CTkLabel(p_row2, text="Plex Token:", width=110, anchor="w").pack(side="left")
+        self.plex_token_entry = ctk.CTkEntry(p_row2, show="*", placeholder_text="X-Plex-Token (opcionális)")
+        self.plex_token_entry.pack(side="left", fill="x", expand=True)
+        self.plex_token_entry.bind("<KeyRelease>", self._on_setting_changed)
+
+        self.btn_test_plex = ctk.CTkButton(plex_frame, text="🔌 Plex kapcsolat tesztelése", command=self._test_plex)
+        self.btn_test_plex.pack(padx=10, pady=(5, 5))
+
+        # Értesítések szekció
+        notif_frame = ctk.CTkFrame(self.tab_integrations)
+        notif_frame.pack(fill="x", padx=10, pady=10, ipadx=5, ipady=5)
+
+        self.chk_notifications = ctk.CTkCheckBox(
+            notif_frame,
+            text="🔔 Push értesítések küldése (Discord / Telegram)",
+            command=self._on_setting_changed
+        )
+        self.chk_notifications.pack(anchor="w", padx=10, pady=(5, 5))
+
+        d_row = ctk.CTkFrame(notif_frame, fg_color="transparent")
+        d_row.pack(fill="x", padx=10, pady=2)
+        ctk.CTkLabel(d_row, text="Discord Webhook:", width=130, anchor="w").pack(side="left")
+        self.discord_url_entry = ctk.CTkEntry(d_row, placeholder_text="https://discord.com/api/webhooks/...")
+        self.discord_url_entry.pack(side="left", fill="x", expand=True)
+        self.discord_url_entry.bind("<KeyRelease>", self._on_setting_changed)
+
+        tg_row = ctk.CTkFrame(notif_frame, fg_color="transparent")
+        tg_row.pack(fill="x", padx=10, pady=2)
+        ctk.CTkLabel(tg_row, text="Telegram Token:", width=130, anchor="w").pack(side="left")
+        self.tg_token_entry = ctk.CTkEntry(tg_row, show="*", placeholder_text="Bot Token")
+        self.tg_token_entry.pack(side="left", fill="x", expand=True, padx=(0, 5))
+        self.tg_token_entry.bind("<KeyRelease>", self._on_setting_changed)
+
+        ctk.CTkLabel(tg_row, text="Chat ID:", width=60, anchor="w").pack(side="left")
+        self.tg_chat_entry = ctk.CTkEntry(tg_row, placeholder_text="Chat ID", width=110)
+        self.tg_chat_entry.pack(side="left")
+        self.tg_chat_entry.bind("<KeyRelease>", self._on_setting_changed)
+
+        self.btn_test_notif = ctk.CTkButton(notif_frame, text="📤 Teszt értesítés küldése", command=self._test_notifications)
+        self.btn_test_notif.pack(padx=10, pady=(5, 5))
+
     def _load_settings_to_ui(self):
         # App 1
         self.dir_entry.insert(0, ",".join(app1_config.watch_dirs))
         self.model_combo.set(app1_config.whisper_model)
         self.device_combo.set(app1_config.whisper_device)
         self.compute_combo.set(app1_config.whisper_compute_type)
+        if app1_config.extract_embedded_subs:
+            self.chk_embedded_subs.select()
+        else:
+            self.chk_embedded_subs.deselect()
+        if app1_config.minimize_to_tray:
+            self.chk_minimize_tray.select()
+        else:
+            self.chk_minimize_tray.deselect()
         
         # App 2
         self.api_provider_combo.set(app2_config.llm_provider)
         
         provider = app2_config.llm_provider.lower().strip()
         if provider == "google":
-            self.api_model_entry.configure(values=["gemini-1.5-flash", "gemini-1.5-pro"])
+            self.api_model_entry.configure(values=["gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash"])
         elif provider == "openai":
             self.api_model_entry.configure(values=["gpt-4o-mini", "gpt-4o"])
         else:
@@ -305,6 +417,31 @@ class PlexSubtitlerApp(ctk.CTk):
         self.target_lang_entry.set(app2_config.target_language or "Hungarian")
         self.batch_size_slider.set(app2_config.translation_batch_size)
         self.batch_size_label.configure(text=str(int(self.batch_size_slider.get())))
+        if app2_config.use_sliding_context:
+            self.chk_sliding_context.select()
+        else:
+            self.chk_sliding_context.deselect()
+
+        # Integrációk
+        if app2_config.plex_auto_refresh:
+            self.chk_plex_refresh.select()
+        else:
+            self.chk_plex_refresh.deselect()
+        self.plex_url_entry.delete(0, "end")
+        self.plex_url_entry.insert(0, app2_config.plex_url or "")
+        self.plex_token_entry.delete(0, "end")
+        self.plex_token_entry.insert(0, app2_config.plex_token or "")
+
+        if app2_config.notifications_enabled:
+            self.chk_notifications.select()
+        else:
+            self.chk_notifications.deselect()
+        self.discord_url_entry.delete(0, "end")
+        self.discord_url_entry.insert(0, app2_config.discord_webhook_url or "")
+        self.tg_token_entry.delete(0, "end")
+        self.tg_token_entry.insert(0, app2_config.telegram_bot_token or "")
+        self.tg_chat_entry.delete(0, "end")
+        self.tg_chat_entry.insert(0, app2_config.telegram_chat_id or "")
 
     def _save_settings_from_ui(self):
         # App 1
@@ -313,6 +450,8 @@ class PlexSubtitlerApp(ctk.CTk):
         app1_config.whisper_model = self.model_combo.get()
         app1_config.whisper_device = self.device_combo.get()
         app1_config.whisper_compute_type = self.compute_combo.get()
+        app1_config.extract_embedded_subs = bool(self.chk_embedded_subs.get())
+        app1_config.minimize_to_tray = bool(self.chk_minimize_tray.get())
         
         # App 2
         app2_config.llm_provider = self.api_provider_combo.get()
@@ -320,6 +459,16 @@ class PlexSubtitlerApp(ctk.CTk):
         app2_config.llm_api_key = self.api_key_entry.get().strip()
         app2_config.target_language = self.target_lang_entry.get().strip()
         app2_config.translation_batch_size = int(self.batch_size_slider.get())
+        app2_config.use_sliding_context = bool(self.chk_sliding_context.get())
+
+        # Integrációk
+        app2_config.plex_auto_refresh = bool(self.chk_plex_refresh.get())
+        app2_config.plex_url = self.plex_url_entry.get().strip()
+        app2_config.plex_token = self.plex_token_entry.get().strip()
+        app2_config.notifications_enabled = bool(self.chk_notifications.get())
+        app2_config.discord_webhook_url = self.discord_url_entry.get().strip()
+        app2_config.telegram_bot_token = self.tg_token_entry.get().strip()
+        app2_config.telegram_chat_id = self.tg_chat_entry.get().strip()
             
         settings_manager.save()
 
@@ -601,6 +750,90 @@ class PlexSubtitlerApp(ctk.CTk):
         def _revert():
             self.tr_start_btn.configure(text=self.orig_tr_btn_text, fg_color=self.orig_tr_btn_fg, hover_color=self.orig_tr_btn_hover, state="normal")
         self.after(3000, _revert)
+
+    # --- Integrációk és Tesztek ---
+    def _test_plex(self):
+        self._save_settings_from_ui()
+        from plex_subtitler.notifier import refresh_plex_library
+        from tkinter import messagebox
+        ok = refresh_plex_library()
+        if ok:
+            messagebox.showinfo("Plex Siker", "Sikeres kapcsolat a Plex Media Serverrel! A könyvtárfrissítés lefutott.")
+        else:
+            messagebox.showwarning("Plex Figyelmeztetés", "Nem sikerült elérni a Plex Media Servert. Ellenőrizd a címet (pl. http://localhost:32400) és az X-Plex-Token-t.")
+
+    def _test_notifications(self):
+        self._save_settings_from_ui()
+        from plex_subtitler.notifier import send_discord_notification, send_telegram_notification
+        from tkinter import messagebox
+        sent = False
+        if app2_config.discord_webhook_url:
+            send_discord_notification("Plex Subtitler Teszt", "Ez egy tesztértesítés a Plex Subtitlertől! A Discord webhook működik. 🎉")
+            sent = True
+        if app2_config.telegram_bot_token and app2_config.telegram_chat_id:
+            send_telegram_notification("Plex Subtitler Teszt", "Ez egy tesztértesítés a Plex Subtitlertől! A Telegram kapcsolat működik. 🎉")
+            sent = True
+
+        if sent:
+            messagebox.showinfo("Értesítés", "A tesztüzenet sikeresen elküldve!")
+        else:
+            messagebox.showwarning("Hiányzó adatok", "Adj meg legalább egy Discord Webhookot vagy Telegram adatokat a teszthez!")
+
+    # --- Rendszertálca (System Tray) Kezelés ---
+    def _create_tray_image(self):
+        if not HAS_TRAY:
+            return None
+        try:
+            img = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
+            draw = ImageDraw.Draw(img)
+            draw.ellipse((4, 4, 60, 60), fill="#E5A00D")
+            draw.polygon([(26, 18), (26, 46), (46, 32)], fill="#1E1E1E")
+            return img
+        except Exception:
+            return None
+
+    def _init_tray(self):
+        if not HAS_TRAY:
+            return
+        try:
+            img = self._create_tray_image()
+            if not img:
+                return
+
+            menu = pystray.Menu(
+                pystray.MenuItem("🎬 Megnyitás", self._tray_open, default=True),
+                pystray.MenuItem("❌ Kilépés", self._tray_exit),
+            )
+            self.tray_icon = pystray.Icon("PlexSubtitler", img, "Plex AI Subtitler", menu)
+            threading.Thread(target=self.tray_icon.run, daemon=True).start()
+        except Exception as e:
+            log.warning("Nem sikerült elindítani a tálcaikont: %s", e)
+            self.tray_icon = None
+
+    def _on_window_close(self):
+        self._save_settings_from_ui()
+        if app1_config.minimize_to_tray and HAS_TRAY and self.tray_icon:
+            self.withdraw()
+            log.info("📌 Alkalmazás a rendszertálcára rejtve. Kattints a tálcaikonra a visszanyitáshoz.")
+        else:
+            self._tray_exit()
+
+    def _tray_open(self, icon=None, item=None):
+        def _show():
+            self.deiconify()
+            self.lift()
+            self.focus_force()
+        self.after(0, _show)
+
+    def _tray_exit(self, icon=None, item=None):
+        if self.tray_icon:
+            try:
+                self.tray_icon.stop()
+            except Exception:
+                pass
+        self._stop_extractor()
+        self._stop_translator()
+        self.after(0, self.destroy)
 
     def _build_help_tab(self):
         help_text = """🎬 Plex Subtitler - Használati Útmutató

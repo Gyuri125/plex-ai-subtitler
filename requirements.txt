@@ -12,6 +12,8 @@ python-dotenv>=1.0.0
 # --- App 1: UX / GUI & Hardware Acceleration ---
 customtkinter>=5.2.0
 torch>=2.0.0
+pystray>=0.19.5
+pillow>=10.0.0
 
 # --- App 2: AI Subtitle Translator (OpenAI, Gemini, Ollama) ---
 openai>=1.30.0

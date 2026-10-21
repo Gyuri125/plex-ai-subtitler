@@ -19,6 +19,7 @@ from watchdog.events import FileSystemEventHandler, FileCreatedEvent, FileMovedE
 
 from plex_subtitler.logger import get_logger
 from plex_subtitler.config import app1_config, app2_config
+from plex_subtitler.notifier import notify_translation_completed
 from .srt_parser import SrtParser
 from .llm_client import get_llm_client, translate_blocks_with_retry
 
@@ -43,6 +44,7 @@ def process_single_srt(srt_path: Path, progress_callback=None, stop_event=None) 
     parser = SrtParser(srt_path)
     total_blocks = len(parser.blocks)
     translated_blocks = []
+    sliding_history: list[str] = []
     
     start_time = time.time()
     processed_count = 0
@@ -52,8 +54,19 @@ def process_single_srt(srt_path: Path, progress_callback=None, stop_event=None) 
             log.warning("Fordítás megszakítva (leállítás).")
             break
             
+        # Gördülő kontextus az előzőleg lefordított sorokból
+        context_text = ""
+        if app2_config.use_sliding_context and sliding_history:
+            recent_lines = sliding_history[-app2_config.sliding_context_size:]
+            context_text = "\n".join(recent_lines)
+
         chunk_text = SrtParser.blocks_to_text_format(chunk)
-        result_text = translate_blocks_with_retry(llm_client, chunk_text, stop_event=stop_event)
+        result_text = translate_blocks_with_retry(
+            llm_client,
+            chunk_text,
+            context_text=context_text,
+            stop_event=stop_event,
+        )
         
         if not result_text:
             log.error("Üres válasz érkezett az API-tól, a blokk nem lett lefordítva.")
@@ -61,6 +74,9 @@ def process_single_srt(srt_path: Path, progress_callback=None, stop_event=None) 
         else:
             t_blocks = SrtParser.apply_translation_to_blocks(chunk, result_text)
             translated_blocks.extend(t_blocks)
+            for b in t_blocks:
+                joined = " ".join(b.lines).replace("\n", " ")
+                sliding_history.append(f"[{b.index}] {joined}")
             
         processed_count += len(chunk)
         if progress_callback:
@@ -73,10 +89,15 @@ def process_single_srt(srt_path: Path, progress_callback=None, stop_event=None) 
         
     if len(translated_blocks) > 0:
         SrtParser.save_srt(translated_blocks, target_path)
+        total_time = time.time() - start_time
         if stop_event and stop_event.is_set():
             log.info(f"⚠️ Fordítás megszakítva. Részeredmény elmentve: {target_path.name}")
         else:
-            log.info(f"✅ Sikeresen lefordítva: {target_path.name}")
+            log.info(f"✅ Sikeresen lefordítva: {target_path.name} ({total_time:.1f} mp)")
+            try:
+                notify_translation_completed(target_path, len(translated_blocks), total_time)
+            except Exception as notify_err:
+                log.warning("Hiba az értesítés küldésekor: %s", notify_err)
 
 
 class SrtEventHandler(FileSystemEventHandler):

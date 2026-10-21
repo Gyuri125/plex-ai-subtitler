@@ -1,12 +1,32 @@
 # -*- mode: python ; coding: utf-8 -*-
+import os
 
+datas = []
+if os.path.exists('plex_subtitler/settings.json'):
+    datas.append(('plex_subtitler/settings.json', '.'))
+elif os.path.exists('plex_subtitler/settings.json.example'):
+    datas.append(('plex_subtitler/settings.json.example', '.'))
 
 a = Analysis(
     ['plex_subtitler\\app1_extractor\\main.py'],
     pathex=['.'],
     binaries=[],
-    datas=[('plex_subtitler/settings.json', '.')],
-    hiddenimports=['plex_subtitler'],
+    datas=datas,
+    hiddenimports=[
+        'plex_subtitler',
+        'plex_subtitler.notifier',
+        'plex_subtitler.config',
+        'plex_subtitler.logger',
+        'plex_subtitler.app1_extractor.subtitle_extractor',
+        'plex_subtitler.app1_extractor.hardware_manager',
+        'plex_subtitler.app2_translator.translator_daemon',
+        'plex_subtitler.app2_translator.llm_client',
+        'plex_subtitler.app2_translator.srt_parser',
+        'pystray',
+        'PIL',
+        'customtkinter',
+        'imageio_ffmpeg',
+    ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
