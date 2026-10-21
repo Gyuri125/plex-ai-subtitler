@@ -26,8 +26,13 @@ echo.
 echo [2/5] Python környezet azonosítása...
 set PYTHON_CMD=python
 if exist ".venv\Scripts\python.exe" (
-    set PYTHON_CMD=.venv\Scripts\python.exe
-    echo [OK] Helyi virtuális környezet (.venv) használata.
+    .venv\Scripts\python.exe --version >nul 2>&1
+    if %ERRORLEVEL% equ 0 (
+        set PYTHON_CMD=.venv\Scripts\python.exe
+        echo [OK] Működő helyi virtuális környezet (.venv) használata.
+    ) else (
+        echo [INFO] A .venv környezet nem érvényes ezen a gépen, a rendszerszintű Python használata...
+    )
 ) else (
     echo [OK] Rendszerszintű Python használata.
 )
