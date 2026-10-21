@@ -1,0 +1,49 @@
+# =============================================================================
+# Plex Subtitler - Sub-package .gitignore
+# =============================================================================
+
+# Settings & Secrets
+settings.json
+!settings.json.example
+.env
+.env.*
+*.env
+!.env.example
+secrets.*
+
+# Execution Logs
+*.log
+processed_files.log
+
+# Media & Extraction
+temp_audio/
+*.wav
+*.mp3
+*.aac
+*.flac
+*.m4a
+*.ogg
+*.opus
+*.mp4
+*.mkv
+*.avi
+*.mov
+*.srt
+
+# Python Cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+
+# Virtual Environments & IDE
+.venv/
+venv/
+env/
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db

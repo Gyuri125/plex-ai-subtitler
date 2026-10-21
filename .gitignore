@@ -1,0 +1,117 @@
+# =============================================================================
+# Plex Subtitler - Root .gitignore
+# =============================================================================
+
+# --- Personal Settings, Secrets & Credentials ---
+# CRITICAL: Never commit personal paths, tokens, or API keys!
+settings.json
+**/settings.json
+!settings.json.example
+!**/settings.json.example
+.env
+.env.*
+*.env
+!.env.example
+!**/.env.example
+secrets.*
+credentials.*
+
+# --- Execution Logs & State Files ---
+*.log
+**/*.log
+processed_files.log
+**/processed_files.log
+
+# --- Media & Extraction Directories ---
+temp_audio/
+**/temp_audio/
+*.wav
+*.mp3
+*.aac
+*.flac
+*.m4a
+*.ogg
+*.opus
+
+# Video files (avoid committing local media test files)
+*.mp4
+*.mkv
+*.avi
+*.mov
+*.wmv
+*.m4v
+
+# Subtitles (avoid committing runtime generated subtitles)
+*.srt
+*.vtt
+
+# --- PyInstaller & Build Artifacts ---
+build/
+dist/
+*.egg-info/
+.eggs/
+eggs/
+parts/
+bin/
+var/
+sdist/
+develop-eggs/
+.installed.cfg
+*.egg
+*.manifest
+*.spec.bak
+
+# --- Python & Bytecode ---
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+.Python
+*.so
+
+# --- Virtual Environments ---
+.venv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# --- IDEs & Code Editors ---
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+*.sublime-project
+*.sublime-workspace
+
+# --- Testing & Static Analysis ---
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+
+# --- Operating System Files ---
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+[Dd]esktop.ini
+$RECYCLE.BIN/
+
+# --- Whisper / HuggingFace Local Model Caches ---
+models/
+**/models/
+*.bin
+*.pt
+*.safetensors
+*.onnx

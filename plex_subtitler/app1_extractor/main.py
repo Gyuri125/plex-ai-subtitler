@@ -1,0 +1,121 @@
+"""
+main.py - Az 1. alkalmazás belépési pontja (Audio Extractor & Whisper STT).
+
+Futtatás:
+    python -m plex_subtitler.app1_extractor.main
+    python -m plex_subtitler.app1_extractor.main --scan-existing
+
+Kapcsolók:
+    --scan-existing   Induláskor átvizsgálja a figyelt mappákat, és feldolgozza
+                      az összes még nem feldolgozott videofájlt.
+    --once PATH       Egyetlen fájlt dolgoz fel és kilép (teszteléshez hasznos).
+    --version         Verzióinformáció kiírása.
+"""
+
+from __future__ import annotations
+
+import argparse
+import sys
+from pathlib import Path
+
+# A csomag gyökérkönyvtárát hozzáadjuk a sys.path-hoz, hogy
+# közvetlen futtatáskor is működjön az importálás.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+from plex_subtitler.logger import get_logger
+from plex_subtitler.config import app1_config
+from plex_subtitler.app1_extractor.watcher import WatcherDaemon
+from plex_subtitler.app1_extractor.file_processor import FileProcessor
+from plex_subtitler.app1_extractor.gui import run_gui
+
+__version__ = "1.0.0"
+
+log = get_logger("app1_main", level=app1_config.log_level)
+
+
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        prog="plex-subtitler-extractor",
+        description=(
+            "🎬 Plex Subtitler - App 1: Audio Extractor & Whisper STT\n"
+            "Figyeli a megadott mappákat, FFmpeg-gel kinyeri az audiot,\n"
+            "majd Whisper segítségével SRT feliratot generál."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+
+    parser.add_argument(
+        "--cli",
+        action="store_true",
+        help="Futás parancssori (headless) módban GUI nélkül.",
+    )
+    parser.add_argument(
+        "--scan-existing",
+        action="store_true",
+        help="Induláskor feldolgozza a már létező, feldolgozatlan fájlokat.",
+    )
+    parser.add_argument(
+        "--once",
+        metavar="VIDEO_PATH",
+        help="Egyetlen fájl feldolgozása és kilépés (teszteléshez).",
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {__version__}",
+    )
+
+    return parser.parse_args()
+
+
+def _print_banner() -> None:
+    banner = f"""
+╔══════════════════════════════════════════════════════════╗
+║     🎬  Plex Subtitler — App 1: Extractor & STT  🎙️     ║
+║     Verzió: {__version__:<46} ║
+║     Whisper modell: {app1_config.whisper_model:<39} ║
+║     Eszköz: {app1_config.whisper_device:<47} ║
+╚══════════════════════════════════════════════════════════╝
+"""
+    print(banner)
+
+
+def main() -> None:
+    args = _parse_args()
+    
+    # Ha nincs megadva a --cli vagy a --once flag, akkor induljon a GUI
+    if not args.cli and not args.once:
+        run_gui()
+        return
+
+    _print_banner()
+
+    # --- Egyszeri feldolgozás mód (--once) ---
+    if args.once:
+        video_path = Path(args.once)
+        if not video_path.exists():
+            log.error("A megadott fájl nem létezik: '%s'", video_path)
+            sys.exit(1)
+
+        log.info("Egyszeri feldolgozás mód: '%s'", video_path.name)
+        processor = FileProcessor()
+        result = processor.process(video_path)
+
+        if result:
+            log.info("✅ Eredmény: '%s'", result)
+            sys.exit(0)
+        else:
+            log.error("❌ A feldolgozás sikertelen.")
+            sys.exit(1)
+
+    # --- Daemon mód (folyamatos mappafigyelés) ---
+    daemon = WatcherDaemon()
+
+    if args.scan_existing:
+        daemon.scan_existing()
+
+    daemon.start()
+
+
+if __name__ == "__main__":
+    main()

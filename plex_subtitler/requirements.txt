@@ -1,0 +1,52 @@
+# Plex Subtitler – Függőségek
+# Telepítés: pip install -r requirements.txt
+
+# -----------------------------------------------------------------------
+# APP 1: Audio Extractor & Whisper STT
+# -----------------------------------------------------------------------
+
+# Mappafigyelő daemon
+watchdog>=4.0.0
+
+# Hordozható, beépített FFmpeg
+imageio-ffmpeg>=0.4.9
+
+# Gyors, hatékony Whisper STT (CTranslate2-alapú)
+# GPU-s futtatáshoz: pip install faster-whisper[cuda]
+faster-whisper>=1.0.3
+
+# Környezeti változók betöltése .env fájlból (opcionális marad, de a fő konfig a JSON)
+python-dotenv>=1.0.0
+
+# -----------------------------------------------------------------------
+# APP 1: UX & GUI & Hardware
+# -----------------------------------------------------------------------
+customtkinter>=5.2.0
+torch>=2.0.0
+
+
+# -----------------------------------------------------------------------
+# APP 2: AI Translator Agent (előkészítés)
+# -----------------------------------------------------------------------
+
+# OpenAI / LLM kliens (több providerhez egységes felület)
+openai>=1.30.0
+
+# Anthropic Claude kliens (opcionális)
+# anthropic>=0.28.0
+
+# Google Gemini kliens (natív támogatás)
+google-genai>=0.2.0
+
+# HTTP kérések (Ollama modellek lekérdezéséhez)
+requests>=2.31.0
+
+# -----------------------------------------------------------------------
+# FEJLESZTŐI ESZKÖZÖK (opcionális)
+# -----------------------------------------------------------------------
+
+# Típusellenőrzés
+# mypy>=1.10.0
+
+# Kódformázó
+# ruff>=0.4.0

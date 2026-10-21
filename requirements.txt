@@ -1,0 +1,22 @@
+# =============================================================================
+# Plex Subtitler – Python Dependencies
+# Install: pip install -r requirements.txt
+# =============================================================================
+
+# --- App 1: Extractor & Whisper STT ---
+watchdog>=4.0.0
+imageio-ffmpeg>=0.4.9
+faster-whisper>=1.0.3
+python-dotenv>=1.0.0
+
+# --- App 1: UX / GUI & Hardware Acceleration ---
+customtkinter>=5.2.0
+torch>=2.0.0
+
+# --- App 2: AI Subtitle Translator (OpenAI, Gemini, Ollama) ---
+openai>=1.30.0
+google-genai>=0.2.0
+requests>=2.31.0
+
+# --- Build & Standalone Packaging (Optional) ---
+# pyinstaller>=6.5.0
