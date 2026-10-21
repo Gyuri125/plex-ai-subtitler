@@ -32,34 +32,34 @@
 <table>
   <tr>
     <td width="50%">
-      <h3>Stage 1: Fast Extraction & Whisper STT</h3>
+      <h3>Stage 1: Extraction, Online Fetch & Whisper STT</h3>
       <ul>
-        <li><b>Embedded Subtitle Fast-Extraction:</b> Probes <code>.mkv</code> and <code>.mp4</code> containers for existing English or Hungarian subtitles. If found, extracts them in under a second and bypasses Whisper entirely.</li>
-        <li><b>Hardware Auto-Tuning Whisper:</b> Automatically inspects CUDA/VRAM and configures the optimal model (<code>small</code>, <code>medium</code>, <code>large-v3</code>).</li>
-        <li><b>File Stabilization:</b> Verifies file write operations are completely finished before processing.</li>
-        <li><b>Deduplication:</b> MD5-based fingerprint tracking in <code>processed_files.log</code> prevents re-processing.</li>
-        <li><b>Automatic Cleanup:</b> Removes temporary audio files immediately after transcription.</li>
+        <li><b>Embedded Subtitle Fast-Extraction:</b> Probes <code>.mkv</code> and <code>.mp4</code> containers for existing subtitles. If found, extracts them in under a second and bypasses Whisper entirely.</li>
+        <li><b>Online Subtitle Downloader (OpenSubtitles):</b> Queries online repositories by 64-bit OSdb moviehash and clean title before Whisper. Downloads finished Hungarian or English subtitles instantly.</li>
+        <li><b>Quality Gate & Hallucination Filter:</b> Removes Whisper phantom texts (e.g. <i>"Thank you for watching"</i>, <i>"Please subscribe"</i>) and fixes invalid or overlapping timestamps.</li>
+        <li><b>Auto-Sync (ffsubsync):</b> Automatically aligns subtitle timing with speech in the video file for millisecond accuracy.</li>
+        <li><b>Hardware Auto-Tuning:</b> Automatically inspects CUDA/VRAM and configures the optimal Whisper model.</li>
       </ul>
     </td>
     <td width="50%">
       <h3>Stage 2: AI Subtitle Translator</h3>
       <ul>
-        <li><b>Sliding Context Window:</b> Injects the most recent translated lines into the subsequent chunk prompt, preserving continuous narrative tone, character gender, and pronoun consistency.</li>
-        <li><b>Cinematic Prompting:</b> Preserves dialogue tone, character idioms, and colloquialisms tailored for natural movie dubbing.</li>
+        <li><b>Sliding Context Window:</b> Injects the most recent translated lines into subsequent prompts, preserving continuous tone, gender, and pronoun consistency.</li>
+        <li><b>Series Memory & Character Glossary:</b> Automatically creates and updates <code>series_context.json</code> across episodes to enforce consistent terminology and address forms.</li>
+        <li><b>Parallel Worker Pipeline:</b> Concurrently processes chunk partitions across multiple threads, cutting total translation time in half.</li>
         <li><b>Multi-Provider:</b> Native support for Google Gemini (Flash / Pro), OpenAI (GPT-4o-mini), and local Ollama (Llama 3 / Mistral).</li>
-        <li><b>Rate-Limit Protection:</b> Intelligent retry mechanism with exponential backoff and HTTP 429 quota waiting.</li>
+        <li><b>Rate-Limit Protection:</b> Intelligent retry mechanism with exponential backoff and quota recovery.</li>
       </ul>
     </td>
   </tr>
   <tr>
     <td width="50%">
-      <h3>Desktop GUI & System Tray</h3>
+      <h3>Desktop GUI & Web Dashboard</h3>
       <ul>
-        <li>CustomTkinter Dark Mode interface.</li>
+        <li>CustomTkinter Dark Mode desktop interface.</li>
+        <li><b>Built-in Web Dashboard:</b> Access, monitor, and configure the application from any web browser or mobile device on headless/NAS servers (port 8080).</li>
         <li><b>Windows System Tray:</b> Minimizes to the taskbar notification area and continues running in the background.</li>
         <li>Dynamic model discovery directly querying available Gemini, OpenAI, or Ollama models.</li>
-        <li>Thread-safe log output with real-time status updates.</li>
-        <li>Single-file processing mode for testing.</li>
       </ul>
     </td>
     <td width="50%">
@@ -246,18 +246,26 @@ services:
 ## Magyar Dokumentacio es Hasznalati Utmutato
 
 ### A rendszer fo komponensei:
-1. **Beagyazott feliratok gyorskinyerese:**
-   Ha az `.mkv` vagy `.mp4` videoban mar talalhato angol vagy magyar felirat, a program 0.5 masodperc alatt kinyeri, igy a Whisper beszdfelismeres lepesatugrasra kerul.
-2. **Gordulo kontextus-ablak (Sliding Context):**
-   A 30 blokkos csomagok elott atadja az elozo jelenet utolso sorait, biztositva a szinkron-stilusos tegezes/onozes es a karakterek nemenak folytonossagat.
-3. **Plex konyvtarfrissites:**
-   A felirat elkeszultekor a program meghivja a Plex API-t, igy a felirat azonnal elerhetove valik a lejatszoban.
-4. **Rendszertalca (System Tray):**
-   A program bezaraskor a Windows ora melle minimalizalhato, es csendben a hatterben vegzi a mappafigyelest.
-5. **Discord es Telegram ertesitesek:**
-   Pushertesites kuldese a forditas elkeszultekor.
-6. **Automata build script (`build_exe.bat`):**
-   Egyetlen kattintassal frissiti a repo-t a GitHubrol es ujraforditja az exe-t.
+1. **Beagyazott feliratok gyorskinyerese (100x gyorsulas):**
+   Ha az `.mkv` vagy `.mp4` videoban mar talalhato angol vagy magyar felirat, a program 0.5 masodperc alatt kinyeri, igy a gep terhelese es a feldolgozasi ido minimalisra csokken.
+2. **Online feliratletoltes (OpenSubtitles):**
+   A videofajl 64-bites hash-e alapjan ellenorzi a netes adatbazisokat. Ha talal kesz magyar feliratot, a forditas is kihagyhato; ha angolt talal, a Whisper lepes ugorhato at.
+3. **Quality Gate es Whisper hallucinacio-szures:**
+   Kiszuri az ismert fantomszovegeket (*"Thank you for watching"*, *"Please subscribe"*, zenei szimbolumok), javitja az atfedo idobelyegeket, es ellenorzi, hogy egyetlen sor sem veszett el a forditas soran.
+4. **Auto-Sync idozites-szinkronizalas (`ffsubsync`):**
+   A felirat idobelyegeit a video valodi hangsavjahoz igazitja millimasodperc pontosan.
+5. **Gordulo kontextus-ablak (Sliding Context):**
+   A blokkok elott atadja az elozo jelenet utolso sorait, biztositva a szinkron-stilusos tegezes/onozes es a karakterek nemenek folytonossagat.
+6. **Sorozat-memoria es karakter-szotar (`series_context.json`):**
+   Sorozatoknal automatikusan rogziti es fejbantartja a foszereplok viszonyat es a visszatero szakkifejezeseket, igy az egesz evad nyelvezete egyseges marad.
+7. **Parhuzamositott forditas (Pipeline Throughput):**
+   Tobbszalu concorrent LLM keresekkel felezi vagy harmadolja a forditas idotartamat.
+8. **Beepitett Web Dashboard (Headless es NAS szerverekhez):**
+   Monitor nelkuli szervereken vagy NAS eszkozokon (port 8080) keresztul bongeszobol es mobilrol is kovetheto az allapot, a naplo es a beallitasok.
+9. **Plex konyvtarfrissites es Push ertesitesek:**
+   Azonnali frissites a Plex API-n keresztul, valamint Discord es Telegram uzenetek.
+10. **Rendszertalca (System Tray) es Automata build script (`build_exe.bat`):**
+    Talcara rejtes es egykattintasos PyInstaller fordito.
 
 ---
 

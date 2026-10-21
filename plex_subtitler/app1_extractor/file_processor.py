@@ -93,6 +93,20 @@ class FileProcessor:
             except Exception as exc:
                 log.warning("Hiba a beagyazott felirat vizsgalatatkor, fallback Whisperre: %s", exc)
 
+        # 0.5. lépés: Online felirat keresése és letöltése az internetről (OpenSubtitles)
+        if app1_config.download_online_subtitles:
+            try:
+                from plex_subtitler.subtitle_downloader import try_download_subtitles
+                online_srt, is_hu = try_download_subtitles(video_path)
+                if online_srt:
+                    self._mark_as_processed(video_path)
+                    if app1_config.auto_sync_subtitles:
+                        from plex_subtitler.sub_sync import auto_sync_subtitle
+                        auto_sync_subtitle(video_path, online_srt)
+                    return online_srt
+            except Exception as exc:
+                log.warning("Hiba az online feliratletoltes soran, fallback Whisperre: %s", exc)
+
         audio_path: Path | None = None
         try:
             # 1. lépés: Audio extrakció
@@ -104,6 +118,24 @@ class FileProcessor:
                 audio_path=audio_path,
                 output_dir=video_path.parent,
             )
+
+            # 2.5. lépés: Quality Gate hallucináció-szűrés és Auto-Sync
+            if app1_config.quality_gate_enabled:
+                try:
+                    from plex_subtitler.app2_translator.srt_parser import SrtParser
+                    from plex_subtitler.quality_gate import clean_whisper_blocks
+                    parser = SrtParser(srt_path)
+                    cleaned = clean_whisper_blocks(parser.blocks)
+                    SrtParser.save_srt(cleaned, srt_path)
+                except Exception as qg_err:
+                    log.warning("Quality Gate figyelmeztetes: %s", qg_err)
+
+            if app1_config.auto_sync_subtitles:
+                try:
+                    from plex_subtitler.sub_sync import auto_sync_subtitle
+                    auto_sync_subtitle(video_path, srt_path)
+                except Exception as sync_err:
+                    log.warning("Auto-sync figyelmeztetes: %s", sync_err)
 
             # 3. lépés: Siker naplózása
             self._mark_as_processed(video_path)

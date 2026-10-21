@@ -49,6 +49,17 @@ class App1Config:
     embedded_sub_languages: list[str] = field(default_factory=lambda: ["eng", "en"])
     minimize_to_tray: bool = True
 
+    # --- Online Feliratletöltés & Minőség ---
+    download_online_subtitles: bool = True
+    opensubtitles_api_key: str = ""
+    auto_sync_subtitles: bool = False
+    quality_gate_enabled: bool = True
+
+    # --- Web Dashboard (Headless / NAS) ---
+    web_dashboard_enabled: bool = False
+    web_dashboard_port: int = 8080
+    web_dashboard_host: str = "0.0.0.0"
+
 
 @dataclass
 class App2Config:
@@ -66,6 +77,10 @@ class App2Config:
     # --- Kontextus-megőrzés (Sliding Context) ---
     use_sliding_context: bool = True
     sliding_context_size: int = 4
+
+    # --- Sorozat-memória és Párhuzamosítás ---
+    series_memory_enabled: bool = True
+    parallel_translation_workers: int = 2
 
     # --- Plex Integráció (Auto-Refresh) ---
     plex_auto_refresh: bool = False

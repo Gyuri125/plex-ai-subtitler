@@ -32,17 +32,28 @@ Gemini-AI_plexfordító/
 ├── Dockerfile                   # Headless konténer Unraid/NAS szerverekhez
 ├── docker-compose.yml           # Docker Compose konfiguráció
 │
+├── tests/                       # Átfogó egységtesztek
+│   └── test_all_features.py     # Pipeline és modul tesztcsomag
+│
 └── plex_subtitler/              # Fő Python csomag
     ├── config.py                # Konfigurációkezelő (SettingsManager singleton, JSON perzisztencia)
     ├── logger.py                # Színezett konzolos és fájl logging
     ├── notifier.py              # Plex Auto-Refresh API hívások és Discord/Telegram értesítések
+    ├── subtitle_downloader.py   # Online feliratletöltés (OpenSubtitles REST API & OSdb hash)
+    ├── sub_sync.py              # Felirat-szinkronizálás beszédhanghoz (ffsubsync integráció)
+    ├── quality_gate.py          # Whisper hallucináció-szűrés és blokk-integritás ellenőrzés
     ├── settings.json            # [GITIGNORED] Felhasználó helyi beállításai és API kulcsai
     ├── processed_files.log      # [GITIGNORED] MD5 ujjlenyomat napló a duplikáció elkerülésére
     ├── temp_audio/              # [GITIGNORED] Ideiglenes 16kHz mono WAV audio kinyerések
     │
+    ├── web/                     # Beépített Web Dashboard (Headless / NAS hozzáférés)
+    │   ├── __init__.py
+    │   ├── server.py            # HTTP szerver és REST API (status, config, logs)
+    │   └── __main__.py          # python -m plex_subtitler.web indító
+    │
     ├── app1_extractor/          # 1. FÁZIS: Mappafigyelés + FFmpeg + faster-whisper
     │   ├── __init__.py
-    │   ├── main.py              # Fő belépési pont (GUI indító vagy CLI argumentum parser)
+    │   ├── main.py              # Fő belépési pont (GUI, CLI, --web argumentumok)
     │   ├── gui.py               # CustomTkinter Dark Mode GUI (Tray ikon, integrációk)
     │   ├── watcher.py           # Watchdog daemon, fájlméret-stabilitás ellenőrzés
     │   ├── file_processor.py    # Pipeline orkesztrátor, MD5 ellenőrzés, fájltakarítás
@@ -53,7 +64,8 @@ Gemini-AI_plexfordító/
     │
     └── app2_translator/         # 2. FÁZIS: SRT szegmentálás + LLM szinkronfordítás
         ├── __init__.py
-        ├── translator_daemon.py # SRT mappafigyelő és fordítási munkaszál koordinátor
+        ├── translator_daemon.py # Párhuzamosított munkaszál-kezelő és fordító orkesztrátor
+        ├── series_memory.py     # Sorozat-memória és karakter-szótár (series_context.json)
         ├── srt_parser.py        # SRT blokk értelmező, 30-as csomagoló és visszamásoló
         └── llm_client.py        # LLM Factory (Gemini, OpenAI, Ollama), Sliding Context, retry logika
 ```

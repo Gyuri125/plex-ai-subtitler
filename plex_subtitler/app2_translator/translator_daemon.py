@@ -30,72 +30,141 @@ _STABILITY_CHECK_INTERVAL = 2.0
 _STABILITY_REQUIRED_CHECKS = 3
 
 def process_single_srt(srt_path: Path, progress_callback=None, stop_event=None) -> None:
-    """Egyedi SRT fájl lefordítása."""
+    """Egyedi SRT fájl lefordítása (párhuzamosított feldolgozással és sorozat-memóriával)."""
     import time
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    from .series_memory import get_series_prompt_injection
+    from plex_subtitler.quality_gate import validate_and_repair_translated_blocks
+    from plex_subtitler.sub_sync import auto_sync_subtitle
+
     llm_client = get_llm_client()
     batch_size = app2_config.translation_batch_size
+    workers = max(1, app2_config.parallel_translation_workers)
     
     target_path = srt_path.parent / f"{srt_path.stem}.hu.srt"
     
     log.info("=" * 60)
-    log.info("Fordítás kezdete: '%s'", srt_path.name)
+    log.info("Fordítás kezdete: '%s' (szálak száma: %d)", srt_path.name, workers)
     log.info("=" * 60)
 
     parser = SrtParser(srt_path)
     total_blocks = len(parser.blocks)
-    translated_blocks = []
-    sliding_history: list[str] = []
-    
+    if total_blocks == 0:
+        log.warning("Az SRT fájl nem tartalmaz feldolgozható blokkokat: '%s'", srt_path.name)
+        return
+
+    chunks = list(parser.get_chunks(batch_size=batch_size))
+    total_chunks = len(chunks)
+    series_context = get_series_prompt_injection(srt_path)
+    if series_context:
+        log.info("Sorozat-kontextus aktív: '%s'", srt_path.name)
+
     start_time = time.time()
     processed_count = 0
-    
-    for chunk in parser.get_chunks(batch_size=batch_size):
-        if stop_event and stop_event.is_set():
-            log.warning("Fordítás megszakítva (leállítás).")
-            break
-            
-        # Gördülő kontextus az előzőleg lefordított sorokból
-        context_text = ""
-        if app2_config.use_sliding_context and sliding_history:
-            recent_lines = sliding_history[-app2_config.sliding_context_size:]
-            context_text = "\n".join(recent_lines)
+    progress_lock = threading.Lock()
 
-        chunk_text = SrtParser.blocks_to_text_format(chunk)
-        result_text = translate_blocks_with_retry(
-            llm_client,
-            chunk_text,
-            context_text=context_text,
-            stop_event=stop_event,
-        )
-        
-        if not result_text:
-            log.error("Üres válasz érkezett az API-tól, a blokk nem lett lefordítva.")
-            translated_blocks.extend(chunk)
-        else:
-            t_blocks = SrtParser.apply_translation_to_blocks(chunk, result_text)
-            translated_blocks.extend(t_blocks)
-            for b in t_blocks:
-                clean_text = b.text.replace("\n", " ").strip()
-                sliding_history.append(f"[{b.index}] {clean_text}")
-            
-        processed_count += len(chunk)
-        if progress_callback:
-            elapsed = time.time() - start_time
-            pct = processed_count / total_blocks if total_blocks > 0 else 0
-            eta = (elapsed / pct - elapsed) if pct > 0 else 0
-            progress_callback(processed_count, total_blocks, elapsed, eta)
-            
-        log.info(f"Fordítás folyamatban: {processed_count}/{total_blocks} blokk kész...")
-        
+    def update_progress(delta_count: int):
+        nonlocal processed_count
+        with progress_lock:
+            processed_count += delta_count
+            if progress_callback:
+                elapsed = time.time() - start_time
+                pct = processed_count / total_blocks if total_blocks > 0 else 0
+                eta = (elapsed / pct - elapsed) if pct > 0 else 0
+                progress_callback(processed_count, total_blocks, elapsed, eta)
+            log.info("Fordítás folyamatban: %d/%d blokk kész...", processed_count, total_blocks)
+
+    def process_chunk_list(chunk_list: list[list]) -> list:
+        partition_results = []
+        sliding_history: list[str] = []
+
+        for chunk in chunk_list:
+            if stop_event and stop_event.is_set():
+                break
+
+            context_parts = []
+            if series_context:
+                context_parts.append(series_context)
+
+            if app2_config.use_sliding_context and sliding_history:
+                recent = sliding_history[-app2_config.sliding_context_size:]
+                context_parts.append("\n".join(recent))
+
+            context_text = "\n\n".join(context_parts)
+            chunk_text = SrtParser.blocks_to_text_format(chunk)
+
+            result_text = translate_blocks_with_retry(
+                llm_client,
+                chunk_text,
+                context_text=context_text,
+                stop_event=stop_event,
+            )
+
+            if not result_text:
+                log.error("Üres válasz érkezett az API-tól, az eredeti blokkot tartjuk meg.")
+                partition_results.extend(chunk)
+            else:
+                t_blocks = SrtParser.apply_translation_to_blocks(chunk, result_text)
+                partition_results.extend(t_blocks)
+                for b in t_blocks:
+                    clean_text = b.text.replace("\n", " ").strip()
+                    sliding_history.append(f"[{b.index}] {clean_text}")
+
+            update_progress(len(chunk))
+
+        return partition_results
+
+    translated_blocks: list = []
+
+    # Ha 1 worker vagy kevés chunk van, egyszerű szekvenciális futás
+    if workers <= 1 or total_chunks <= 1:
+        translated_blocks = process_chunk_list(chunks)
+    else:
+        # Párhuzamos partíciókra bontás
+        num_partitions = min(workers, total_chunks)
+        part_size = (total_chunks + num_partitions - 1) // num_partitions
+        partitions = [chunks[i:i + part_size] for i in range(0, total_chunks, part_size)]
+
+        partition_results_ordered = [None] * len(partitions)
+        with ThreadPoolExecutor(max_workers=len(partitions)) as executor:
+            future_to_idx = {
+                executor.submit(process_chunk_list, part): idx 
+                for idx, part in enumerate(partitions)
+            }
+            for future in as_completed(future_to_idx):
+                idx = future_to_idx[future]
+                try:
+                    partition_results_ordered[idx] = future.result()
+                except Exception as exc:
+                    log.error("Hiba a partíció fordításakor (szál %d): %s", idx, exc)
+                    # Fallback az eredeti chunkokra
+                    fallback_chunk_blocks = [b for chk in partitions[idx] for b in chk]
+                    partition_results_ordered[idx] = fallback_chunk_blocks
+
+        for part_res in partition_results_ordered:
+            if part_res:
+                translated_blocks.extend(part_res)
+
     if len(translated_blocks) > 0:
-        SrtParser.save_srt(translated_blocks, target_path)
+        # Quality Gate ellenőrzés és javítás
+        final_blocks = validate_and_repair_translated_blocks(parser.blocks, translated_blocks)
+        SrtParser.save_srt(final_blocks, target_path)
         total_time = time.time() - start_time
+
+        # Opcionális automatikus időzítés-szinkronizálás, ha elérhető a referencia videó
+        if app1_config.auto_sync_subtitles:
+            for ext in [".mkv", ".mp4", ".avi", ".mov"]:
+                candidate_video = srt_path.with_suffix(ext)
+                if candidate_video.exists():
+                    auto_sync_subtitle(candidate_video, target_path)
+                    break
+
         if stop_event and stop_event.is_set():
             log.info(f"Forditas megszakitva. Reszeredmeny elmentve: {target_path.name}")
         else:
             log.info(f"Sikeresen leforditva: {target_path.name} ({total_time:.1f} mp)")
             try:
-                notify_translation_completed(target_path, len(translated_blocks), total_time)
+                notify_translation_completed(target_path, len(final_blocks), total_time)
             except Exception as notify_err:
                 log.warning("Hiba az értesítés küldésekor: %s", notify_err)
 

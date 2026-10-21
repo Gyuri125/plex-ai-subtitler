@@ -195,9 +195,9 @@ class PlexSubtitlerApp(ctk.CTk):
         ctk.CTkLabel(wh_frame, text="Nagyobb modell = pontosabb felirat, de több memóriát (VRAM) igényel.", font=ctk.CTkFont(size=11), text_color="gray").grid(row=2, column=0, columnspan=2, padx=10, pady=(0, 5), sticky="w")
         ctk.CTkLabel(wh_frame, text="int8: Gyengébb gépekre / fp16: Dedikált GPU-ra.", font=ctk.CTkFont(size=11), text_color="gray").grid(row=2, column=2, columnspan=2, padx=10, pady=(0, 5), sticky="w")
         
-        # Extra opciók (Beágyazott felirat és Rendszertálca)
+        # Extra opciók (Beágyazott felirat, Online felirat, Auto-sync, Quality Gate)
         extra_opt_frame = ctk.CTkFrame(self.tab_extractor, fg_color="transparent")
-        extra_opt_frame.pack(fill="x", padx=5, pady=(0, 5))
+        extra_opt_frame.pack(fill="x", padx=5, pady=(0, 2))
         
         self.chk_embedded_subs = ctk.CTkCheckBox(
             extra_opt_frame, 
@@ -206,6 +206,14 @@ class PlexSubtitlerApp(ctk.CTk):
         )
         self.chk_embedded_subs.pack(side="left", padx=5)
         ToolTip(self.chk_embedded_subs, "Ha a letöltött videóban már van angol felirat, 0.5 mp alatt kinyeri és kihagyja a Whispert.")
+
+        self.chk_online_subs = ctk.CTkCheckBox(
+            extra_opt_frame,
+            text="Online feliratkeresés (OpenSubtitles)",
+            command=self._on_setting_changed
+        )
+        self.chk_online_subs.pack(side="left", padx=10)
+        ToolTip(self.chk_online_subs, "Hash és cím alapján kész feliratot keres a netről a Whisper előtt.")
         
         self.chk_minimize_tray = ctk.CTkCheckBox(
             extra_opt_frame, 
@@ -214,6 +222,25 @@ class PlexSubtitlerApp(ctk.CTk):
         )
         self.chk_minimize_tray.pack(side="right", padx=5)
         ToolTip(self.chk_minimize_tray, "Az ablak bezárásakor a program a háttérben fut tovább a Windows tálcaikonján.")
+
+        extra_opt_frame2 = ctk.CTkFrame(self.tab_extractor, fg_color="transparent")
+        extra_opt_frame2.pack(fill="x", padx=5, pady=(2, 5))
+
+        self.chk_auto_sync = ctk.CTkCheckBox(
+            extra_opt_frame2,
+            text="Auto-Sync időzítés-igazítás (ffsubsync)",
+            command=self._on_setting_changed
+        )
+        self.chk_auto_sync.pack(side="left", padx=5)
+        ToolTip(self.chk_auto_sync, "A felirat időbélyegeit automatikusan a videó beszédhangjához igazítja.")
+
+        self.chk_quality_gate = ctk.CTkCheckBox(
+            extra_opt_frame2,
+            text="Quality Gate (Hallucináció-szűrés)",
+            command=self._on_setting_changed
+        )
+        self.chk_quality_gate.pack(side="left", padx=10)
+        ToolTip(self.chk_quality_gate, "Kiszűri a Whisper fantomszövegeit és ellenőrzi a felirat integritását.")
 
         # Vezérlő gombok
         ctrl_frame = ctk.CTkFrame(self.tab_extractor, fg_color="transparent")
@@ -288,8 +315,24 @@ class PlexSubtitlerApp(ctk.CTk):
             text="Gördülő kontextus-ablak (Sliding Context)",
             command=self._on_setting_changed
         )
-        self.chk_sliding_context.grid(row=2, column=0, columnspan=2, padx=10, pady=(5, 5), sticky="w")
+        self.chk_sliding_context.grid(row=2, column=0, padx=10, pady=(5, 5), sticky="w")
         ToolTip(self.chk_sliding_context, "Átadja az előző blokkok lefordított sorait az LLM-nek a konzisztens szinkronhangnem és tegezés/önözés érdekében.")
+
+        self.chk_series_memory = ctk.CTkCheckBox(
+            trans_frame,
+            text="Sorozat-memória és karakter szótár (Series Glossary)",
+            command=self._on_setting_changed
+        )
+        self.chk_series_memory.grid(row=2, column=1, padx=10, pady=(5, 5), sticky="w")
+        ToolTip(self.chk_series_memory, "Sorozatok esetén megőrzi a tegezés/magázás szabályait és a szakkifejezéseket az epizódok között.")
+
+        self.chk_parallel = ctk.CTkCheckBox(
+            trans_frame,
+            text="Párhuzamosított fordítás (Gyorsítás 2 szálon)",
+            command=self._on_setting_changed
+        )
+        self.chk_parallel.grid(row=3, column=0, columnspan=2, padx=10, pady=(5, 5), sticky="w")
+        ToolTip(self.chk_parallel, "Többszálú konkurens LLM kérések a fordítási idő csökkentéséhez.")
         
         trans_frame.columnconfigure(1, weight=1)
 
@@ -384,6 +427,27 @@ class PlexSubtitlerApp(ctk.CTk):
         self.btn_test_notif = ctk.CTkButton(notif_frame, text="Teszt értesítés küldése", command=self._test_notifications)
         self.btn_test_notif.pack(padx=10, pady=(5, 5))
 
+        # Web Dashboard szekció
+        web_frame = ctk.CTkFrame(self.tab_integrations)
+        web_frame.pack(fill="x", padx=10, pady=10, ipadx=5, ipady=5)
+
+        self.chk_web_dashboard = ctk.CTkCheckBox(
+            web_frame,
+            text="Beépített Web Dashboard engedélyezése (Böngészős / NAS hozzáférés)",
+            command=self._on_setting_changed
+        )
+        self.chk_web_dashboard.pack(anchor="w", padx=10, pady=(5, 5))
+
+        w_row = ctk.CTkFrame(web_frame, fg_color="transparent")
+        w_row.pack(fill="x", padx=10, pady=2)
+        ctk.CTkLabel(w_row, text="Web Port:", width=130, anchor="w").pack(side="left")
+        self.web_port_entry = ctk.CTkEntry(w_row, placeholder_text="8080", width=80)
+        self.web_port_entry.pack(side="left")
+        self.web_port_entry.bind("<KeyRelease>", self._on_setting_changed)
+
+        self.btn_open_web = ctk.CTkButton(w_row, text="Dashboard megnyitása", width=150, command=self._open_web_browser)
+        self.btn_open_web.pack(side="left", padx=10)
+
     def _load_settings_to_ui(self):
         # App 1
         self.dir_entry.insert(0, ",".join(app1_config.watch_dirs))
@@ -394,6 +458,18 @@ class PlexSubtitlerApp(ctk.CTk):
             self.chk_embedded_subs.select()
         else:
             self.chk_embedded_subs.deselect()
+        if app1_config.download_online_subtitles:
+            self.chk_online_subs.select()
+        else:
+            self.chk_online_subs.deselect()
+        if app1_config.auto_sync_subtitles:
+            self.chk_auto_sync.select()
+        else:
+            self.chk_auto_sync.deselect()
+        if app1_config.quality_gate_enabled:
+            self.chk_quality_gate.select()
+        else:
+            self.chk_quality_gate.deselect()
         if app1_config.minimize_to_tray:
             self.chk_minimize_tray.select()
         else:
@@ -421,6 +497,14 @@ class PlexSubtitlerApp(ctk.CTk):
             self.chk_sliding_context.select()
         else:
             self.chk_sliding_context.deselect()
+        if app2_config.series_memory_enabled:
+            self.chk_series_memory.select()
+        else:
+            self.chk_series_memory.deselect()
+        if app2_config.parallel_translation_workers > 1:
+            self.chk_parallel.select()
+        else:
+            self.chk_parallel.deselect()
 
         # Integrációk
         if app2_config.plex_auto_refresh:
@@ -443,6 +527,13 @@ class PlexSubtitlerApp(ctk.CTk):
         self.tg_chat_entry.delete(0, "end")
         self.tg_chat_entry.insert(0, app2_config.telegram_chat_id or "")
 
+        if app1_config.web_dashboard_enabled:
+            self.chk_web_dashboard.select()
+        else:
+            self.chk_web_dashboard.deselect()
+        self.web_port_entry.delete(0, "end")
+        self.web_port_entry.insert(0, str(app1_config.web_dashboard_port or 8080))
+
     def _save_settings_from_ui(self):
         # App 1
         dirs_str = self.dir_entry.get().strip()
@@ -451,6 +542,9 @@ class PlexSubtitlerApp(ctk.CTk):
         app1_config.whisper_device = self.device_combo.get()
         app1_config.whisper_compute_type = self.compute_combo.get()
         app1_config.extract_embedded_subs = bool(self.chk_embedded_subs.get())
+        app1_config.download_online_subtitles = bool(self.chk_online_subs.get())
+        app1_config.auto_sync_subtitles = bool(self.chk_auto_sync.get())
+        app1_config.quality_gate_enabled = bool(self.chk_quality_gate.get())
         app1_config.minimize_to_tray = bool(self.chk_minimize_tray.get())
         
         # App 2
@@ -460,6 +554,8 @@ class PlexSubtitlerApp(ctk.CTk):
         app2_config.target_language = self.target_lang_entry.get().strip()
         app2_config.translation_batch_size = int(self.batch_size_slider.get())
         app2_config.use_sliding_context = bool(self.chk_sliding_context.get())
+        app2_config.series_memory_enabled = bool(self.chk_series_memory.get())
+        app2_config.parallel_translation_workers = 2 if self.chk_parallel.get() else 1
 
         # Integrációk
         app2_config.plex_auto_refresh = bool(self.chk_plex_refresh.get())
@@ -469,8 +565,22 @@ class PlexSubtitlerApp(ctk.CTk):
         app2_config.discord_webhook_url = self.discord_url_entry.get().strip()
         app2_config.telegram_bot_token = self.tg_token_entry.get().strip()
         app2_config.telegram_chat_id = self.tg_chat_entry.get().strip()
+
+        app1_config.web_dashboard_enabled = bool(self.chk_web_dashboard.get())
+        try:
+            app1_config.web_dashboard_port = int(self.web_port_entry.get().strip() or "8080")
+        except ValueError:
+            app1_config.web_dashboard_port = 8080
             
         settings_manager.save()
+
+    def _open_web_browser(self):
+        import webbrowser
+        self._save_settings_from_ui()
+        port = app1_config.web_dashboard_port or 8080
+        from plex_subtitler.web import start_web_dashboard_thread
+        start_web_dashboard_thread(host=app1_config.web_dashboard_host, port=port)
+        webbrowser.open(f"http://localhost:{port}")
 
     def _on_provider_changed(self, choice):
         # Frissítsük az alapértelmezett beépített listákat, ha a user vált, de a fetch modellt is használhatja

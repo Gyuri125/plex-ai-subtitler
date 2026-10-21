@@ -21,7 +21,14 @@
             "eng",
             "en"
         ],
-        "minimize_to_tray": true
+        "minimize_to_tray": true,
+        "download_online_subtitles": true,
+        "opensubtitles_api_key": "",
+        "auto_sync_subtitles": false,
+        "quality_gate_enabled": true,
+        "web_dashboard_enabled": false,
+        "web_dashboard_port": 8080,
+        "web_dashboard_host": "0.0.0.0"
     },
     "app2": {
         "llm_provider": "google",
@@ -35,6 +42,8 @@
         "log_level": "INFO",
         "use_sliding_context": true,
         "sliding_context_size": 4,
+        "series_memory_enabled": true,
+        "parallel_translation_workers": 2,
         "plex_auto_refresh": false,
         "plex_url": "http://localhost:32400",
         "plex_token": "",

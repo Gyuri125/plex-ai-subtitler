@@ -50,6 +50,17 @@ def _parse_args() -> argparse.Namespace:
         help="Futás parancssori (headless) módban GUI nélkül.",
     )
     parser.add_argument(
+        "--web",
+        action="store_true",
+        help="Beépített webes dashboard indítása böngészős/NAS vezérléshez.",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=8080,
+        help="A webes dashboard portja (alapértelmezett: 8080).",
+    )
+    parser.add_argument(
         "--scan-existing",
         action="store_true",
         help="Induláskor feldolgozza a már létező, feldolgozatlan fájlokat.",
@@ -83,8 +94,14 @@ def _print_banner() -> None:
 def main() -> None:
     args = _parse_args()
     
-    # Ha nincs megadva a --cli vagy a --once flag, akkor induljon a GUI
-    if not args.cli and not args.once:
+    # Opcionális webes dashboard indítása
+    if args.web or app1_config.web_dashboard_enabled:
+        from plex_subtitler.web import start_web_dashboard_thread
+        port = args.port or app1_config.web_dashboard_port
+        start_web_dashboard_thread(host=app1_config.web_dashboard_host, port=port)
+
+    # Ha nincs megadva a --cli, --web vagy a --once flag, akkor induljon a GUI
+    if not args.cli and not args.once and not args.web:
         run_gui()
         return
 
