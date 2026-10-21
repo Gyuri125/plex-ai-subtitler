@@ -80,7 +80,7 @@ class SrtParser:
             for block in blocks:
                 f.write(block.to_string())
                 f.write("\n")
-        log.info(f"💾 Fordított SRT mentve: {output_path.name}")
+        log.info(f"Forditott SRT mentve: {output_path.name}")
 
     @staticmethod
     def blocks_to_text_format(blocks: list[SrtBlock]) -> str:
@@ -130,7 +130,7 @@ class SrtParser:
                     SrtBlock(index=block.index, timestamp=block.timestamp, text=translations[block.index])
                 )
             else:
-                log.warning(f"⚠️ Hiányzó fordítás a {block.index}. blokkhoz! Az eredetit tartjuk meg.")
+                log.warning(f"Hianyzo forditas a {block.index}. blokkhoz. Az eredetit tartjuk meg.")
                 translated_blocks.append(block)
                 
         return translated_blocks

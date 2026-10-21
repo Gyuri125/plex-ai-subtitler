@@ -63,7 +63,7 @@ class VideoEventHandler(FileSystemEventHandler):
     def _enqueue(self, path: Path) -> None:
         """Ellenőrzi a kiterjesztést, majd beteszi a sorba."""
         if path.suffix.lower() in SUPPORTED_EXTENSIONS:
-            log.info("📂 Új fájl észlelve, sorba helyezve: '%s'", path.name)
+            log.info("Uj fajl eszlelve, sorba helyezve: '%s'", path.name)
             self._queue.put(path)
 
 
@@ -97,7 +97,7 @@ class WatcherDaemon:
         worker_thread.start()
 
         self._observer.start()
-        log.info("🚀 Mappafigyelő elindult. Állítsd le: Ctrl+C")
+        log.info("Mappafigyelo elindult. Leallitas: Ctrl+C")
         log.info("Figyelt mappák:")
         for d in app1_config.watch_dirs:
             log.info("  → %s", d)
@@ -192,7 +192,7 @@ class WatcherDaemon:
 
         log.info("Feldolgozó munkaszál megvárása (max. 60 mp)...")
         worker_thread.join(timeout=60)
-        log.info("✅ Mappafigyelő leállítva.")
+        log.info("Mappafigyelo leallitva.")
 
 
 # ---------------------------------------------------------------------------

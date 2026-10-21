@@ -86,12 +86,12 @@ class FileProcessor:
                 if emb_srt:
                     self._mark_as_processed(video_path)
                     if is_hu:
-                        log.info("🎉 Beágyazott MAGYAR felirat kinyerve: '%s'. A videó kész!", emb_srt.name)
+                        log.info("Beagyazott MAGYAR felirat kinyerve: '%s'. A video kesz!", emb_srt.name)
                     else:
-                        log.info("⚡ Beágyazott felirat kinyerve: '%s'. Whisper átugorva, kész a fordításra!", emb_srt.name)
+                        log.info("Beagyazott felirat kinyerve: '%s'. Whisper kihagyva, kesz a forditasra.", emb_srt.name)
                     return emb_srt
             except Exception as exc:
-                log.warning("Hiba a beágyazott felirat vizsgálatakor, fallback Whisperre: %s", exc)
+                log.warning("Hiba a beagyazott felirat vizsgalatatkor, fallback Whisperre: %s", exc)
 
         audio_path: Path | None = None
         try:
@@ -107,15 +107,15 @@ class FileProcessor:
 
             # 3. lépés: Siker naplózása
             self._mark_as_processed(video_path)
-            log.info("✅ Sikeresen feldolgozva: '%s' → '%s'", video_path.name, srt_path.name)
+            log.info("Sikeresen feldolgozva: '%s' -> '%s'", video_path.name, srt_path.name)
             return srt_path
 
         except (AudioExtractionError, TranscriptionError, FileNotFoundError) as exc:
-            log.error("❌ Feldolgozási hiba '%s': %s", video_path.name, exc)
+            log.error("Feldolgozasi hiba '%s': %s", video_path.name, exc)
             return None
 
         except Exception as exc:
-            log.exception("💥 Váratlan hiba '%s': %s", video_path.name, exc)
+            log.exception("Varatlan hiba '%s': %s", video_path.name, exc)
             return None
 
         finally:

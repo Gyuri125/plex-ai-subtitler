@@ -37,7 +37,7 @@ def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="plex-subtitler-extractor",
         description=(
-            "🎬 Plex Subtitler - App 1: Audio Extractor & Whisper STT\n"
+            "Plex Subtitler - App 1: Audio Extractor & Whisper STT\n"
             "Figyeli a megadott mappákat, FFmpeg-gel kinyeri az audiot,\n"
             "majd Whisper segítségével SRT feliratot generál."
         ),
@@ -70,12 +70,12 @@ def _parse_args() -> argparse.Namespace:
 
 def _print_banner() -> None:
     banner = f"""
-╔══════════════════════════════════════════════════════════╗
-║     🎬  Plex Subtitler — App 1: Extractor & STT  🎙️     ║
-║     Verzió: {__version__:<46} ║
-║     Whisper modell: {app1_config.whisper_model:<39} ║
-║     Eszköz: {app1_config.whisper_device:<47} ║
-╚══════════════════════════════════════════════════════════╝
+============================================================
+       Plex Subtitler - App 1: Extractor & STT
+       Verzio: {__version__:<44}
+       Whisper modell: {app1_config.whisper_model:<37}
+       Eszkoz: {app1_config.whisper_device:<45}
+============================================================
 """
     print(banner)
 
@@ -102,10 +102,10 @@ def main() -> None:
         result = processor.process(video_path)
 
         if result:
-            log.info("✅ Eredmény: '%s'", result)
+            log.info("Eredmeny: '%s'", result)
             sys.exit(0)
         else:
-            log.error("❌ A feldolgozás sikertelen.")
+            log.error("A feldolgozas sikertelen.")
             sys.exit(1)
 
     # --- Daemon mód (folyamatos mappafigyelés) ---

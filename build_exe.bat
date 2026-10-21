@@ -3,7 +3,7 @@ chcp 65001 >nul
 title Plex AI Subtitler - Build & Auto-Updater
 
 echo =============================================================================
-echo   🎬 Plex AI Subtitler - Automata Fordító és Frissítő Rendszer
+echo   Plex AI Subtitler - Automata Fordito es Frissito Rendszer
 echo =============================================================================
 echo.
 
@@ -64,7 +64,7 @@ echo Ez a folyamat a hardvertől függően 1-2 percet vehet igénybe...
 if exist "dist\PlexSubtitler\PlexSubtitler.exe" (
     echo.
     echo =============================================================================
-    echo   🎉 SIKERES FORDÍTÁS! AZ ÚJ VERZIÓ ELKÉSZÜLT ÉS FELÜLÍRTA A RÉGIT!
+    echo   SIKERES FORDÍTÁS! AZ ÚJ VERZIÓ ELKÉSZÜLT ÉS FELÜLÍRTA A RÉGIT!
     echo =============================================================================
     echo   Futtatható fájl helye:
     echo   dist\PlexSubtitler\PlexSubtitler.exe
@@ -77,7 +77,7 @@ if exist "dist\PlexSubtitler\PlexSubtitler.exe" (
 ) else (
     echo.
     echo =============================================================================
-    echo   ❌ HIBA TÖRTÉNT A FORDÍTÁS SORÁN!
+    echo   HIBA TÖRTÉNT A FORDÍTÁS SORÁN!
     echo   Ellenőrizd a fenti hibaüzeneteket.
     echo =============================================================================
 )

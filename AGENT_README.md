@@ -1,6 +1,6 @@
-# 🤖 Plex AI Subtitler — Agent & Developer Architecture Guide
+# Plex AI Subtitler — Agent & Developer Architecture Guide
 
-> **Célközönség:** AI fejlesztő ágensek (Antigravity, Claude, Cursor, Copilot) és szoftvermérnökök.  
+> **Célközönség:** Fejlesztő ágensek és szoftvermérnökök.  
 > **Tartalom:** Rendszerarchitektúra, modulok felelősségi köre, belső adatfolyamok, szálkezelés, konfigurációs életciklus és biztonsági szabályok.
 
 ---
@@ -167,16 +167,16 @@ A Plex külső feliratfelismerő motorja a fájlnevek struktúrájára támaszko
 
 Ha módosítod vagy bővíted a kódbázist, kövesd az alábbi szigorú szabályokat:
 
-1. 🚫 **Soha ne commitolj személyes adatot vagy titkot!**
+1. **Soha ne commitolj személyes adatot vagy titkot:**
    - A `settings.json`, `.env`, `processed_files.log` és a médiafájlok mindig maradjanak a `.gitignore`-ban.
    - Ha új beállítást adsz hozzá a `config.py`-hoz, frissítsd a `settings.json.example`-t is!
-2. 🧵 **Tartsd tiszteletben a szálbiztonságot:**
+2. **Tartsd tiszteletben a szálbiztonságot:**
    - GUI műveleteket tilos háttérszálból közvetlenül hívni; mindig használd a `.after(0, ...)` mechanizmust.
-3. 🌐 **Karakterkódolás:**
+3. **Karakterkódolás:**
    - Minden feliratfájl beolvasása és mentése szigorúan `utf-8` kódolással történjen (`encoding="utf-8"`).
-4. 📂 **Elérési utak kezelése:**
+4. **Elérési utak kezelése:**
    - Mindig a `pathlib.Path` modult használd az operációs rendszerek közötti kompatibilitás érdekében (Windows duplaper vs. Unix perjel).
-5. 🛡️ **PyInstaller kompatibilitás:**
+5. **PyInstaller kompatibilitás:**
    - Ne használj olyan relatív fájlelérési utakat (`__file__`), amelyek nem veszik figyelembe a `sys.frozen` állapotot! Használd a `config.ROOT_DIR`-t.
 
 ---

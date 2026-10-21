@@ -38,15 +38,15 @@ class HardwareManager:
                 # get_device_properties() memóriája bájtokban van
                 total_memory_bytes = torch.cuda.get_device_properties(0).total_memory
                 self.vram_gb = total_memory_bytes / (1024 ** 3)
-                log.info("💻 GPU detektálva: %s (VRAM: %.1f GB)", self.gpu_name, self.vram_gb)
+                log.info("GPU detektálva: %s (VRAM: %.1f GB)", self.gpu_name, self.vram_gb)
             else:
-                log.info("🖥️ Csak CPU detektálva (vagy nincs CUDA telepítve).")
+                log.info("Csak CPU detektálva (vagy nincs CUDA telepítve).")
                 
         except ImportError:
-            log.warning("⚠️ A 'torch' csomag nem található. Hardver-detektálás CPU módra áll vissza.")
+            log.warning("A 'torch' csomag nem található. Hardver-detektálás CPU módra áll vissza.")
             self.has_cuda = False
         except Exception as e:
-            log.warning("⚠️ Hiba a hardver-detektálás során: %s. CPU módra áll vissza.", e)
+            log.warning("Hiba a hardver-detektálás során: %s. CPU módra áll vissza.", e)
             self.has_cuda = False
 
     def get_recommended_profile(self) -> dict[str, str]:
@@ -92,7 +92,7 @@ class HardwareManager:
         profile = self.get_recommended_profile()
         
         log.info(
-            "⚙️ Auto-Fallback alkalmazása: Eszköz='%s', Modell='%s', Típus='%s'",
+            "Auto-Fallback alkalmazása: Eszköz='%s', Modell='%s', Típus='%s'",
             profile["whisper_device"],
             profile["whisper_model"],
             profile["whisper_compute_type"]

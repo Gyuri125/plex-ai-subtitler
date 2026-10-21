@@ -37,17 +37,17 @@ def refresh_plex_library() -> bool:
     if plex_token:
         headers["X-Plex-Token"] = plex_token
 
-    log.info("📡 Plex könyvtárfrissítés indítása: %s", refresh_url)
+    log.info("Plex konyvtarfrissites inditasa: %s", refresh_url)
     try:
         response = requests.get(refresh_url, headers=headers, timeout=5)
         if response.status_code in [200, 204]:
-            log.info("✅ Plex könyvtárfrissítés sikeresen elküldve! A felirat azonnal elérhető.")
+            log.info("Plex konyvtarfrissites sikeresen elkuldve. A felirat elerheto.")
             return True
         else:
-            log.warning("Plex válaszkód: %s (%s)", response.status_code, response.text[:200])
+            log.warning("Plex valaszkod: %s (%s)", response.status_code, response.text[:200])
             return False
     except Exception as exc:
-        log.warning("Nem sikerült elérni a Plex Media Servert (%s): %s", plex_url, exc)
+        log.warning("Nem sikerult elerni a Plex Media Servert (%s): %s", plex_url, exc)
         return False
 
 
@@ -62,7 +62,7 @@ def send_discord_notification(title: str, message: str) -> bool:
     payload = {
         "embeds": [
             {
-                "title": f"🎬 {title}",
+                "title": f"Plex Subtitler: {title}",
                 "description": message,
                 "color": 15049741,  # Plex narancssárga szín (#E5A00D)
                 "footer": {"text": "Plex AI Subtitler"},
@@ -88,7 +88,7 @@ def send_telegram_notification(title: str, message: str) -> bool:
         return False
 
     url = f"https://api.telegram.org/bot{token}/sendMessage"
-    text = f"🎬 *{title}*\n\n{message}"
+    text = f"*{title}*\n\n{message}"
     payload = {
         "chat_id": chat_id,
         "text": text,
@@ -113,9 +113,9 @@ def notify_translation_completed(srt_path: Path, block_count: int, elapsed_secon
     title = f"Felirat elkészült: {movie_name}"
     message = (
         f"A **{movie_name}** magyar felirata sikeresen lefordítva és elmentve!\n"
-        f"📊 Blokkmennyiség: {block_count} blokk\n"
-        f"⏱️ Fordítási idő: {time_str}\n"
-        f"📁 Fájl: `{srt_path.name}`"
+        f"- Blokkmennyiség: {block_count} blokk\n"
+        f"- Fordítási idő: {time_str}\n"
+        f"- Fájl: `{srt_path.name}`"
     )
 
     # 1. Plex értesítés és refresh

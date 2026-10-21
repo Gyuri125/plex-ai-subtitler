@@ -75,8 +75,8 @@ def process_single_srt(srt_path: Path, progress_callback=None, stop_event=None) 
             t_blocks = SrtParser.apply_translation_to_blocks(chunk, result_text)
             translated_blocks.extend(t_blocks)
             for b in t_blocks:
-                joined = " ".join(b.lines).replace("\n", " ")
-                sliding_history.append(f"[{b.index}] {joined}")
+                clean_text = b.text.replace("\n", " ").strip()
+                sliding_history.append(f"[{b.index}] {clean_text}")
             
         processed_count += len(chunk)
         if progress_callback:
@@ -91,9 +91,9 @@ def process_single_srt(srt_path: Path, progress_callback=None, stop_event=None) 
         SrtParser.save_srt(translated_blocks, target_path)
         total_time = time.time() - start_time
         if stop_event and stop_event.is_set():
-            log.info(f"⚠️ Fordítás megszakítva. Részeredmény elmentve: {target_path.name}")
+            log.info(f"Forditas megszakitva. Reszeredmeny elmentve: {target_path.name}")
         else:
-            log.info(f"✅ Sikeresen lefordítva: {target_path.name} ({total_time:.1f} mp)")
+            log.info(f"Sikeresen leforditva: {target_path.name} ({total_time:.1f} mp)")
             try:
                 notify_translation_completed(target_path, len(translated_blocks), total_time)
             except Exception as notify_err:
@@ -119,7 +119,7 @@ class SrtEventHandler(FileSystemEventHandler):
             # Ne vegyük sorba a már magyar fájlokat
             if path.name.endswith(".hu.srt"):
                 return
-            log.info("📂 Új SRT észlelve, sorba helyezve fordításra: '%s'", path.name)
+            log.info("Uj SRT eszlelve, sorba helyezve forditasra: '%s'", path.name)
             self._queue.put(path)
 
 
@@ -145,7 +145,7 @@ class TranslatorDaemon:
         worker_thread.start()
 
         self._observer.start()
-        log.info("🚀 Fordító mappafigyelő elindult.")
+        log.info("Fordito mappafigyelo elindult.")
 
         try:
             while not self._stop_event.is_set():
@@ -214,7 +214,7 @@ class TranslatorDaemon:
         self._observer.stop()
         self._observer.join(timeout=5)
         worker_thread.join(timeout=10)
-        log.info("✅ Fordító Mappafigyelő leállítva.")
+        log.info("Fordito Mappafigyelo leallitva.")
 
 
 def _wait_for_file_stable(path: Path) -> None:

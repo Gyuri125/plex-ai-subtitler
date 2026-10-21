@@ -137,9 +137,9 @@ def try_extract_embedded_subtitles(video_path: Path) -> tuple[Path | None, bool]
     for s in streams:
         if s["is_text"] and any(s["lang"].startswith(h) for h in hu_targets):
             hu_path = parent / f"{stem}.hu.srt"
-            log.info("🎯 Beágyazott MAGYAR feliratsáv észlelve (Stream 0:%d)!", s["stream_index"])
+            log.info("Beágyazott MAGYAR feliratsáv észlelve (Stream 0:%d).", s["stream_index"])
             if extract_single_subtitle_stream(video_path, s["stream_index"], hu_path):
-                log.info("⚡ Sikeresen kinyerve a magyar felirat: '%s' (0.5 mp alatt!)", hu_path.name)
+                log.info("Sikeresen kinyerve a magyar felirat: '%s' (0.5 mp alatt).", hu_path.name)
                 return hu_path, True
 
     # 2. Van-e beágyazott angol (vagy forrásnyelvű) szöveges felirat?
@@ -147,9 +147,9 @@ def try_extract_embedded_subtitles(video_path: Path) -> tuple[Path | None, bool]
     for s in streams:
         if s["is_text"] and any(s["lang"].startswith(e) for e in en_targets):
             en_path = parent / f"{stem}.srt"
-            log.info("⚡ Beágyazott forrásnyelvű (%s) feliratsáv észlelve (Stream 0:%d)!", s["lang"], s["stream_index"])
+            log.info("Beágyazott forrásnyelvű (%s) feliratsáv észlelve (Stream 0:%d).", s["lang"], s["stream_index"])
             if extract_single_subtitle_stream(video_path, s["stream_index"], en_path):
-                log.info("✅ Beágyazott felirat kinyerve: '%s'. Whisper STT kihagyva!", en_path.name)
+                log.info("Beágyazott felirat kinyerve: '%s'. Whisper STT kihagyva.", en_path.name)
                 return en_path, False
 
     # 3. Fallback: Ha van olyan szöveges feliratsáv, aminek a nyelve ismeretlen (und), és csak 1 van
@@ -157,9 +157,9 @@ def try_extract_embedded_subtitles(video_path: Path) -> tuple[Path | None, bool]
     if len(text_streams) == 1 and text_streams[0]["lang"] == "und":
         s = text_streams[0]
         en_path = parent / f"{stem}.srt"
-        log.info("⚡ Ismeretlen nyelvű (und), egyetlen beágyazott felirat kinyerése (Stream 0:%d)...", s["stream_index"])
+        log.info("Ismeretlen nyelvű (und) beágyazott felirat kinyerése (Stream 0:%d)...", s["stream_index"])
         if extract_single_subtitle_stream(video_path, s["stream_index"], en_path):
-            log.info("✅ Beágyazott felirat kinyerve: '%s'. Whisper STT kihagyva!", en_path.name)
+            log.info("Beágyazott felirat kinyerve: '%s'. Whisper STT kihagyva.", en_path.name)
             return en_path, False
 
     return None, False
