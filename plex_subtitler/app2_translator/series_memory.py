@@ -84,6 +84,7 @@ def load_series_context(file_path: Path) -> dict:
 
     if not ctx_path.exists():
         try:
+            ctx_path.parent.mkdir(parents=True, exist_ok=True)
             with open(ctx_path, "w", encoding="utf-8") as f:
                 json.dump(default_data, f, ensure_ascii=False, indent=2)
         except Exception as exc:

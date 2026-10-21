@@ -139,15 +139,20 @@ Another line here.
             detect_series_info, load_series_context, get_series_prompt_injection
         )
         sample_path = Path("Shows/Loki/Season 01/Loki.S01E03.1080p.mkv")
-        info = detect_series_info(sample_path)
-        self.assertIsNotNone(info)
-        self.assertEqual(info["season"], 1)
-        self.assertEqual(info["episode"], 3)
-        self.assertEqual(info["title"], "Loki")
+        try:
+            info = detect_series_info(sample_path)
+            self.assertIsNotNone(info)
+            self.assertEqual(info["season"], 1)
+            self.assertEqual(info["episode"], 3)
+            self.assertEqual(info["title"], "Loki")
 
-        prompt_inj = get_series_prompt_injection(sample_path)
-        self.assertIn("SERIES CONTEXT MEMORY", prompt_inj)
-        self.assertIn("Loki", prompt_inj)
+            prompt_inj = get_series_prompt_injection(sample_path)
+            self.assertIn("SERIES CONTEXT MEMORY", prompt_inj)
+            self.assertIn("Loki", prompt_inj)
+        finally:
+            import shutil
+            if Path("Shows").exists():
+                shutil.rmtree("Shows", ignore_errors=True)
         print("[PASS] 10. Sorozat-memória és karakter szótár működése ellenőrizve.")
 
     def test_11_quality_gate(self):
