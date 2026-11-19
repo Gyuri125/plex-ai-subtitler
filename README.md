@@ -214,8 +214,9 @@ plex-ai-subtitler/
 ├── plex_subtitler/
 │   ├── __init__.py                      # Verzio (1.3.0)
 │   ├── config.py                        # .env + atomikus settings.json + corrupt recovery
-│   ├── logger.py                        # 3-szintu fallback fájlnaplo, faulthandler, crash hooks
+│   ├── logger.py                        # 3-szintu fallback fajlnaplo, faulthandler, crash hooks
 │   ├── error_helper.py                  # ERR-* hibakodok, ongyogyito fixek, ZIP hibacsomag, health check
+│   ├── notifier.py                      # Windows Toast es csendes hangjelzes
 │   ├── app1_extractor/
 │   │   ├── audio_extractor.py           # FFmpeg sav-felismeres, szoveges felirat + PGS OCR + WAV
 │   │   ├── file_processor.py            # 4-lepeses forras-pipeline
@@ -234,8 +235,7 @@ plex-ai-subtitler/
 │       ├── srt_parser.py                # BOM/CRLF-turo SRT parser
 │       ├── srt_formatter.py             # TV/Plex 42 kar/2 sor formazo, atfedes-javito, +-ms shift
 │       ├── sync_verifier.py             # 8000 Hz WAV RMS (NumPy) szinkron-ellenorzo es Auto-Align
-│       ├── plex_client.py               # Plex Media Server konyvtar-frissito kliens
-│       └── notifier.py                  # Windows Toast es csendes hangjelzes
+│       └── plex_client.py               # Plex Media Server konyvtar-frissito kliens
 └── tests/                               # 51 automata pytest teszt (10 tesztmodul + conftest.py)
 ```
 
