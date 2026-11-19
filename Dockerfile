@@ -1,32 +1,27 @@
 # =============================================================================
-# Plex AI Subtitler - Headless Docker Image (Home Server / NAS / Unraid)
+# Plex AI Subtitler v1.3.0 - Headless Docker Image (Home Server / NAS / Unraid)
 # =============================================================================
 
-FROM python:3.11-slim
+FROM python:3.12-slim
 
-# Rendszerszintű függőségek telepítése (FFmpeg & alapcsomagok)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
-    git \
+    tesseract-ocr \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Függőségek másolása és telepítése
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Forráskód másolása
+COPY main.py doctor_gpu.py settings.example.json ./
 COPY plex_subtitler ./plex_subtitler
-COPY settings.json.example ./settings.json.example
+COPY assets ./assets
 
-# Média és konfig mappák előkészítése
-RUN mkdir -p /media /app/plex_subtitler/temp_audio
+RUN mkdir -p /media /app/logs /app/temp_audio
 
-# Környezeti változók (Python unbuffered logokhoz)
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 
-# Konténer indítása headless (CLI) módban
-ENTRYPOINT ["python", "-m", "plex_subtitler.app1_extractor.main", "--cli", "--scan-existing"]
+ENTRYPOINT ["python", "main.py", "--cli", "--app", "both", "--scan-existing"]

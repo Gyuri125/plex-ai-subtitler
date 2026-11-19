@@ -1,117 +1,91 @@
-# =============================================================================
-# Plex Subtitler - Root .gitignore
-# =============================================================================
-
-# --- Personal Settings, Secrets & Credentials ---
-# CRITICAL: Never commit personal paths, tokens, or API keys!
-settings.json
-**/settings.json
-!settings.json.example
-!**/settings.json.example
-.env
-.env.*
-*.env
-!.env.example
-!**/.env.example
-secrets.*
-credentials.*
-
-# --- Execution Logs & State Files ---
-*.log
-**/*.log
-processed_files.log
-**/processed_files.log
-
-# --- Media & Extraction Directories ---
-temp_audio/
-**/temp_audio/
-*.wav
-*.mp3
-*.aac
-*.flac
-*.m4a
-*.ogg
-*.opus
-
-# Video files (avoid committing local media test files)
-*.mp4
-*.mkv
-*.avi
-*.mov
-*.wmv
-*.m4v
-
-# Subtitles (avoid committing runtime generated subtitles)
-*.srt
-*.vtt
-
-# --- PyInstaller & Build Artifacts ---
-build/
-dist/
-*.egg-info/
-.eggs/
-eggs/
-parts/
-bin/
-var/
-sdist/
-develop-eggs/
-.installed.cfg
-*.egg
-*.manifest
-*.spec.bak
-
-# --- Python & Bytecode ---
+# Python
 __pycache__/
-**/__pycache__/
 *.py[cod]
 *$py.class
-*.pyo
-*.pyd
-.Python
 *.so
-
-# --- Virtual Environments ---
+.Python
 .venv/
 venv/
 env/
 ENV/
-env.bak/
-venv.bak/
+*.egg-info/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 
-# --- IDEs & Code Editors ---
+# IDE / Editor
 .idea/
 .vscode/
 *.swp
 *.swo
 *~
-*.sublime-project
-*.sublime-workspace
 
-# --- Testing & Static Analysis ---
-.pytest_cache/
-.coverage
-htmlcov/
-.mypy_cache/
-.ruff_cache/
-.tox/
-.nox/
+# Titkos kulcsok es futasideju konfiguraciok (API kulcsok, Plex token!)
+.env
+.env.*
+!.env.example
+settings.json
+**/settings.json
+!settings.example.json
+!**/settings.example.json
+*.bak
+*.tmp
 
-# --- Operating System Files ---
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-[Dd]esktop.ini
-$RECYCLE.BIN/
+# Nem nyilvanos / belso / szemelyes dokumentumok es jegyzetek
+AGENT_README.md
+PRIVATE*.md
+*_PRIVATE.md
+*_INTERNAL.md
+LOCAL*.md
+*NOTES*.md
+personal/
+private/
+secrets/
 
-# --- Whisper / HuggingFace Local Model Caches ---
+# Naplok, hardver-riportok, cache es ideiglenes fajlok
+logs/
+*.log
+processed_files.log
+series_cache.json
+*.cache.json
+hardware_report.json
+temp_audio/
+temp_subs/
+
+# Mediafajlok es kimeneti feliratok
+*.mp4
+*.mkv
+*.avi
+*.mov
+*.m4v
+*.ts
+*.wav
+*.mp3
+*.srt
+*.sup
+*.sub
+*.idx
+*.lrc
+
+# Whisper / ML modellek
+whisper_models/
 models/
-**/models/
-*.bin
 *.pt
-*.safetensors
+*.bin
 *.onnx
+
+# PyInstaller build kimenetek, binarisok es hibacsomagok
+build/
+dist/
+release/
+_internal/
+*.spec
+*.exe
+*.lnk
+PlexSubtitler_Hibacsomag_*.zip
+
+# Operacios rendszer fajlok
+.DS_Store
+Thumbs.db
+desktop.ini

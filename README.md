@@ -1,367 +1,252 @@
 <div align="center">
 
 # Plex AI Subtitler
-### Automated Speech-to-Text and LLM Translation Pipeline for Plex Media Server
 
-[![Python Version](https://img.shields.io/badge/Python-3.11%2B-blue?logo=python&logoColor=white)](https://www.python.org/)
-[![STT Engine](https://img.shields.io/badge/STT-faster--whisper-orange?logo=openai&logoColor=white)](https://github.com/SYSTRAN/faster-whisper)
-[![LLM Translation](https://img.shields.io/badge/LLM-Gemini%20%7C%20OpenAI%20%7C%20Ollama-7852FF?logo=google-gemini&logoColor=white)](https://ai.google.dev/)
-[![GUI](https://img.shields.io/badge/GUI-CustomTkinter%20Dark-1f538d?logo=tkinter&logoColor=white)](https://github.com/TomSchimansky/CustomTkinter)
-[![Web Dashboard](https://img.shields.io/badge/Web%20UI-Port%208080-00A389?logo=html5&logoColor=white)](#built-in-web-dashboard)
-[![System Tray](https://img.shields.io/badge/Tray-pystray-2ea44f?logo=windows&logoColor=white)](#desktop-gui--system-tray)
-[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)](#docker-and-nas-support)
-[![Plex](https://img.shields.io/badge/Plex-Native%20Auto--Refresh-E5A00D?logo=plex&logoColor=white)](https://www.plex.tv/)
+### Automated Subtitle Extraction, Speech-to-Text, Audio Sync, and LLM Translation Engine for Plex Media Server
+
+[![Version](https://img.shields.io/badge/Version-1.3.0-blue)](https://github.com/Gyuri125/plex-ai-subtitler/releases)
+[![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![STT](https://img.shields.io/badge/STT-faster--whisper-orange)](https://github.com/SYSTRAN/faster-whisper)
+[![LLM](https://img.shields.io/badge/LLM-Ollama%20%7C%20Gemini%20%7C%20OpenAI%20%7C%20Groq%20%7C%20DeepSeek-7852FF)](#ai-forditas-es-kontextus-megorzes)
+[![GUI](https://img.shields.io/badge/GUI-CustomTkinter%20%2B%20Drag%20%26%20Drop-1f538d)](#felhasznaloi-felulet-egyszeru-es-halado-nezet)
+[![Docker](https://img.shields.io/badge/Docker-Headless%20Ready-2496ED?logo=docker&logoColor=white)](#docker-es-nas-futtatas)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![GitHub Repo](https://img.shields.io/badge/GitHub-Gyuri125%2Fplex--ai--subtitler-181717?logo=github&logoColor=white)](https://github.com/Gyuri125/plex-ai-subtitler)
 
-<br />
-
-**[English Documentation](#architecture-pipeline)** | **[Magyar Nyelvű Dokumentáció](#magyar-dokumentacio-es-hasznalati-utmutato)** | **[Agent & Developer Guide](AGENT_README.md)**
-
-<br />
-
-<p align="center">
-  <b>Plex AI Subtitler</b> is an end-to-end automated pipeline that monitors your media library, instantly extracts embedded subtitles, queries online subtitle repositories by exact 64-bit release hash, transcribes speech with <code>faster-whisper</code>, removes hallucinations via Quality Gate, synchronizes timing with <code>ffsubsync</code>, translates into natural Hungarian using LLMs with sliding context and series memory across parallel worker threads, refreshes Plex instantly, and exposes a real-time Web Dashboard.
-</p>
+**[English Overview](#english-overview)** | **[Magyar Dokumentacio](#magyar-dokumentacio)** | **[Ultimate Installer](#ultimate-telepito-es-elozetes-hardverfelmeres)** | **[CLI Reference](#parancssori-hasznalat-cli)**
 
 </div>
 
 ---
 
-## Table of Contents
+## English Overview
 
-- [Key Architecture Features](#key-architecture-features)
-- [Performance & Pipeline Comparison](#performance--pipeline-comparison)
-- [Architecture Pipeline](#architecture-pipeline)
-- [Plex File Naming Convention](#plex-file-naming-convention)
-- [Hardware Auto-Tuning Matrix](#hardware-auto-tuning-matrix)
-- [Built-in Web Dashboard](#built-in-web-dashboard)
-- [Series Memory & Character Glossary](#series-memory--character-glossary)
-- [Installation & Quick Start](#installation--quick-start)
-- [Standalone Executable Build & Auto-Updater](#standalone-executable-build--auto-updater)
-- [Docker and NAS Support](#docker-and-nas-support)
-- [Configuration Reference](#configuration-reference)
-- [Magyar Dokumentacio es Hasznalati Utmutato](#magyar-dokumentacio-es-hasznalati-utmutato)
-- [License](#license)
+**Plex AI Subtitler** is a production-ready, fault-tolerant subtitle pipeline built for **Plex Media Server** (Windows desktop with native Drag & Drop GUI and headless CLI/Docker for home servers).
 
----
+### Core Capabilities
 
-## Key Architecture Features
-
-<table>
-  <tr>
-    <td width="50%">
-      <h3>Stage 1: Discovery, Extraction & STT</h3>
-      <ul>
-        <li><b>Embedded Subtitle Fast-Extraction:</b> Probes <code>.mkv</code> and <code>.mp4</code> containers for existing subtitles. If found, extracts them in under a second and skips Whisper completely.</li>
-        <li><b>Online Subtitle Downloader (OpenSubtitles):</b> Calculates 64-bit OSdb moviehash and clean release title to fetch exact-match subtitles prior to running local transcription.</li>
-        <li><b>Quality Gate & Hallucination Filter:</b> Automatically removes Whisper phantom patterns (<i>"Thank you for watching"</i>, <i>"Please subscribe"</i>, music symbols) and repairs timestamp overlaps.</li>
-        <li><b>Auto-Sync (ffsubsync):</b> Aligns subtitle timestamps to actual speech detected in the audio track for millisecond-level precision.</li>
-        <li><b>Hardware Auto-Tuning:</b> Automatically inspects CUDA/VRAM and configures the optimal Whisper model.</li>
-      </ul>
-    </td>
-    <td width="50%">
-      <h3>Stage 2: AI Subtitle Translation</h3>
-      <ul>
-        <li><b>Sliding Context Window:</b> Injects preceding dialogue into subsequent chunk prompts, preserving continuous tone, gender, and pronoun consistency.</li>
-        <li><b>Series Memory & Character Glossary:</b> Automatically creates and updates <code>series_context.json</code> across episodes to enforce uniform terminology and address forms.</li>
-        <li><b>Parallel Worker Pipeline:</b> Concurrently processes chunk partitions across multiple threads, cutting total translation time in half.</li>
-        <li><b>Multi-Provider:</b> Native support for Google Gemini (Flash / Pro), OpenAI (GPT-4o-mini), and local Ollama (Llama 3 / Mistral).</li>
-        <li><b>Rate-Limit Protection:</b> Intelligent retry mechanism with exponential backoff and quota recovery.</li>
-      </ul>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%">
-      <h3>Control Interfaces</h3>
-      <ul>
-        <li><b>CustomTkinter Desktop GUI:</b> Modern dark-themed interface with real-time logs and setting management.</li>
-        <li><b>Built-in Web Dashboard:</b> Access, monitor, and configure the application from any web browser or mobile device on headless/NAS servers (port 8080).</li>
-        <li><b>Windows System Tray:</b> Minimizes to the taskbar notification area and continues running in the background.</li>
-        <li><b>Dynamic Model Discovery:</b> Direct querying of available models from Google, OpenAI, or Ollama.</li>
-      </ul>
-    </td>
-    <td width="50%">
-      <h3>Integrations & Notifications</h3>
-      <ul>
-        <li><b>Plex Auto-Refresh:</b> Calls the Plex API (<code>/library/sections/all/refresh</code>) as soon as the subtitle is ready so it appears in the player immediately.</li>
-        <li><b>Discord & Telegram Alerts:</b> Receive push notifications with translation duration and block statistics.</li>
-        <li><b>Sidecar Naming:</b> Generates <code>movie.srt</code> and <code>movie.hu.srt</code> for 100% native Plex compatibility.</li>
-      </ul>
-    </td>
-  </tr>
-</table>
+- **4-Step Smart Subtitle Source Pipeline:**
+  1. Instant text subtitle extraction from MKV/MP4 containers (`subrip`, `ass`, `mov_text`, `webvtt`) via FFmpeg.
+  2. Optional Blu-ray PGS (`hdmv_pgs_subtitle`) / DVD VobSub image subtitle OCR (`pgsrip` + Tesseract OCR).
+  3. Optional OpenSubtitles API lookup by exact 64-bit OpenSubtitles release hash.
+  4. `faster-whisper` GPU/CPU speech-to-text transcription with automatic commentary-track avoidance and VRAM unloading before local LLM inference.
+- **Context-Aware LLM Translation & TV/Plex Formatting:**
+  - Supports **100% local Ollama** (auto-starts `ollama serve`, auto-pulls missing models, dynamic `keep_alive`) as well as **Google Gemini, OpenAI, Groq, DeepSeek, and OpenRouter**.
+  - Automatic rolling movie-context prompt injection, custom character Glossary, checkpointed crash-safe resume (`.part` recovery), TV/Plex 42-char / 2-line wrapping, overlap fixing, and quality metrics (`%`).
+- **Real Audio-to-Subtitle Sync Verification & Auto-Align:**
+  - Measures true 8000 Hz WAV speech energy (RMS, vectorized with NumPy) against SRT timestamps and automatically corrects uniform drift within `+-3000 ms`.
+- **Upfront Hardware Profiling & Ultimate Windows Installer:**
+  - `TELEPITO_ULTIMATE.bat` + `setup_ultimate.ps1` survey OS, CPU, RAM, NVIDIA GPU/VRAM/driver, and free disk space before installation, select the optimal tier (`CUDA_ULTRA`, `CUDA_MID`, `CUDA_ENTRY`, `CPU_ONLY`), pre-install all dependencies (VC++ Redistributable, Python 3.12, FFmpeg, Tesseract OCR, Ollama + model, `uv`, PyTorch, PyInstaller), run tests, build `PlexSubtitler.exe`, and write full installation logs.
+- **Resilient Diagnostics & Logging:**
+  - Short error codes (`ERR-OLLAMA-01` .. `ERR-GEN-99`), 1-click self-healing fixes in the error dialog, live GPU/AI/FFmpeg/Plex health bar, built-in History & Resume window, 1-click secret-redacted diagnostic `.zip` export, 3-tier writable log-directory fallback, `faulthandler` native crash logging, Tkinter callback crash capture, and atomic `settings.json` saves.
+- **Plex & Gaming Awareness:**
+  - Native Plex Media Server library refresh API (`X-Plex-Token`), Windows Toast notifications, fullscreen Direct3D/Vulkan game pause guard (`SHQueryUserNotificationState`), and optional Windows Task Scheduler logon watcher.
 
 ---
 
-## Performance & Pipeline Comparison
+## Magyar Dokumentacio
 
-| Processing Mode | Step 1 (Audio / Text) | Step 2 (Translation) | Total Time for 2h Movie | CPU / GPU Load |
-| :--- | :--- | :--- | :--- | :--- |
-| **A. Embedded Subtitle Path** | Instant container extract (0.5s) | Parallel LLM translation | **~35 seconds** | Near zero |
-| **B. Online Hash-Match Path** | OpenSubtitles API download (1.0s) | Parallel LLM translation | **~36 seconds** | Near zero |
-| **C. Whisper STT + Parallel LLM** | faster-whisper STT (~3-8 min) | Parallel LLM translation | **~4-9 minutes** | Moderate (GPU/CPU) |
-| *Previous Sequential Baseline* | faster-whisper STT (~10-15 min) | Sequential single-thread LLM | ~13-18 minutes | Heavy |
+A **Plex AI Subtitler (v1.3.0)** egy teljes koru, helyi vagy felhos AI-alapu felirat-kinyero, hangfelismero (Whisper), szinkron-ellenorzo es filmfelirat-fordito rendszer Plex Media Serverhez.
 
----
-
-## Architecture Pipeline
+### Mukodesi folyamat
 
 ```mermaid
 flowchart TD
-    subgraph Storage [" Storage & Media "]
-        Video["New Video File\n(.mkv / .mp4)"]
-    end
+    INPUT["Film (.mkv/.mp4) vagy Sorozat mappa (Drag & Drop / Figyelo)"] --> CACHE{"Series Cache: kesz mar?"}
+    CACHE -->|"Igen"| SKIP["Atugras (0 mp)"]
+    CACHE -->|"Nem / Uj epizod (elsobbseg)"| STEP1
 
-    subgraph Stage1 [" Stage 1: Extraction & Whisper STT "]
-        Watch["Watchdog Daemon\n(File size stability check)"]
-        Dedup{"Processed\nalready?"}
-        Probe{"Embedded sub\nin container?"}
-        FastSub["Instant Sub Extract\n(0.5s, skips Whisper)"]
-        OnlineCheck{"Online match\nin OpenSubtitles?"}
-        OnlineDl["Download Subtitle\n(1.0s, skips Whisper)"]
-        FFmpeg["FFmpeg Audio Extract\n(16kHz Mono WAV)"]
-        Whisper["faster-whisper\n(VAD filtering + STT)"]
-        QGate["Quality Gate\n(Removes hallucinations\n& fixes timestamps)"]
-        AutoSync["Auto-Sync (ffsubsync)\nAligns to audio speech"]
-        SrtEN["movie.srt (Original / English)"]
-    end
+    STEP1["1. Beagyazott szoveges felirat kinyerese (FFmpeg)"] -->|"Megvan"| ALIGN
+    STEP1 -->|"Nincs"| STEP2["2. Blu-ray PGS / VobSub OCR (pgsrip + Tesseract)"]
+    STEP2 -->|"Megvan"| ALIGN
+    STEP2 -->|"Nincs"| STEP3["3. OpenSubtitles 64-bit hash kereses (opcionalis)"]
+    STEP3 -->|"Megvan"| ALIGN
+    STEP3 -->|"Nincs"| STEP4["4. Hang kinyerese + faster-whisper (CUDA/CPU)"] --> UNLOAD["Whisper VRAM urites"] --> ALIGN
 
-    subgraph Stage2 [" Stage 2: AI Translator Engine "]
-        WatchSRT["SRT Watcher\n(Detects new .srt)"]
-        SeriesMem["Series Memory\n(series_context.json)"]
-        ParallelPipe["Parallel Worker Pipeline\n(ThreadPoolExecutor 2x)"]
-        SlidingCtx["Sliding Context Window\n(Recent lines injected)"]
-        LLM["LLM Translation\n(Gemini / OpenAI / Ollama)"]
-        IntegrityCheck["Validation & Reassembly\n(Zero missing blocks)"]
-        SrtHU["movie.hu.srt (Hungarian)"]
-    end
-
-    subgraph Output [" Delivery & Control "]
-        PlexRefresh["Plex Auto-Refresh\n(/library/sections/all/refresh)"]
-        Notif["Discord & Telegram Push"]
-        WebUI["Web Dashboard\n(http://localhost:8080)"]
-        Plex["Plex Media Server Player"]
-    end
-
-    Video --> Watch
-    Watch --> Dedup
-    Dedup -- No --> Probe
-    Dedup -- Yes --> Skip["Skip"]
-    Probe -- "Yes (hu)" --> SrtHU
-    Probe -- "Yes (en)" --> FastSub --> SrtEN
-    Probe -- "No" --> OnlineCheck
-    OnlineCheck -- "Yes (hu)" --> SrtHU
-    OnlineCheck -- "Yes (en)" --> OnlineDl --> SrtEN
-    OnlineCheck -- "No" --> FFmpeg --> Whisper --> QGate --> AutoSync --> SrtEN
-    SrtEN --> WatchSRT
-    WatchSRT --> SeriesMem --> ParallelPipe
-    ParallelPipe --> SlidingCtx --> LLM --> IntegrityCheck --> SrtHU
-    SrtHU --> PlexRefresh --> Plex
-    SrtHU --> Notif
-    SrtHU -.-> WebUI
+    ALIGN["Auto-Align 8000 Hz WAV RMS szinkron (opcionalis)"] --> TRANS["AI Forditas (Ollama / Gemini / OpenAI / Groq / DeepSeek)"]
+    TRANS --> CTX["Automata filmkontextus + Glossary + TV/Plex sortores (42 kar/2 sor)"]
+    CTX --> SAVE["Kesz .hu.srt mentese (checkpoint resume + minoseg %)"]
+    SAVE --> DONE["Plex API frissites + Windows Toast + Hangjelzes"]
 ```
 
 ---
 
-## Plex File Naming Convention
+## Ultimate Telepito es Elozetes Hardverfelmeres
 
-Plex Media Server automatically indexes subtitles that follow standard sidecar naming conventions:
+A gyokermappaban talalhato [TELEPITO_ULTIMATE.bat](TELEPITO_ULTIMATE.bat) dupla kattintassal indithato Windows 10/11 alatt. PowerShell vegrehajtasi korlatozas nelkul (`-ExecutionPolicy Bypass`) futtatja a [setup_ultimate.ps1](setup_ultimate.ps1) telepitot, es mar az inditaskor kulon indito naplot ir (`logs/install_bat_YYYYMMDD_HHMMSS.log`).
+
+### 0. lepes: Automatikus hardverprofil-valasztas
+
+A telepito minden letoltes elott felmeri a gepet (OS, CPU magszam, teljes es szabad RAM, NVIDIA GPU / VRAM / driver `nvidia-smi`-vel, szabad tarhely), elmenti a `logs/hardware_report.json` riportot, es automatikusan kivalasztja a hardverhez illo profilt:
+
+| Hardverprofil | Detektalt feltetel | PyTorch | Whisper profil | Lokalis Ollama modell | Blokkméret |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| `CUDA_ULTRA` | NVIDIA GPU `>= 11 GB` VRAM (pl. RTX 3080 12 GB, 3090, 4080, 4090) | `cu124` + cuBLAS/cuDNN | `large-v3` (`cuda` / `float16`) | `gemma3:12b` | `12` |
+| `CUDA_MID` | NVIDIA GPU `7.5 - 10.9 GB` VRAM (pl. RTX 3060 Ti, 3070, 4060) | `cu124` + cuBLAS/cuDNN | `large-v3` (`cuda` / `float16`) | `gemma3:4b` | `10` |
+| `CUDA_ENTRY` | NVIDIA GPU `4.0 - 7.4 GB` VRAM (pl. RTX 3050, GTX 1660) | `cu124` + cuBLAS/cuDNN | `medium` (`cuda` / `float16`) | `gemma3:4b` | `8` |
+| `CPU_ONLY` | Nincs CUDA GPU vagy `< 4 GB` VRAM | CPU (kisebb meret) | `small` (`cpu` / `int8`) | `gemma3:4b` (`>= 12 GB` RAM) / `gemma3:1b` | `6` |
+
+### Mit telepit elo automatikusan az Ultimate Telepito?
+
+1. **Microsoft Visual C++ Redistributable (x64)** — a PyTorch es CTranslate2 nativ DLL-ekhez.
+2. **Python 3.12** — ha hianyzik vagy regebbi, automatikusan telepiti (`winget` vagy hivatalos python.org telepito).
+3. **FFmpeg + ffprobe** — rendszerszintu telepites (`winget`, fallbackkent a beepitett `imageio-ffmpeg` is elerheto).
+4. **Tesseract OCR** — Blu-ray PGS kepfeliratok szovegge alakitasahoz, PATH-ba regisztralva.
+5. **Ollama + hardverhez illo AI modell** — telepiti, elinditja a hatterben, es lehuzza a kivalasztott modellt.
+6. **`uv` + `.venv` + PyTorch (CUDA/CPU) + `requirements.txt` + PyInstaller** — teljes fuggoseg-import ellenorzessel.
+7. **Hardverhez igazitott `settings.json`** — korabbi beallitasok biztonsagi mentesevel (`.pre_install.bak`).
+8. **Automata `pytest` + `doctor_gpu.py --live-llm`** — teljes onellenorzes es elo AI probaforditas.
+9. **`PlexSubtitler.exe` build + Asztali parancsikonok** — `Film feliratozas (Huzd ide).lnk` (`--quick`) es `Plex Subtitler.lnk`, opcionalisan Windows Task Scheduler hatterfigyelo (`-EnableAutostart`).
+
+Telepites kozben es vegen reszletes osszegzo tablazat keszul a `logs/install_ultimate_YYYYMMDD_HHMMSS.log` fajlba.
+
+---
+
+## Felhasznaloi Felulet (Egyszeru es Halado Nezet)
+
+- **Egyszeru nezet & 1-Click Gyors mod (`--quick`):**
+  - Nativ Drag & Drop: egyetlen film (`.mkv`, `.mp4`, `.avi`, `.mov`, `.m4v`, `.ts`), tobb epizod vagy teljes sorozat-mappa behuzhato kozvetlenul az ablakba.
+  - **Sorozat-cache (`series_cache.json`) es elsobbsegi varolista:** a mar kesz epizodokat 0 masodperc alatt atugorja, a kesobb bemasolt uj epizodok pedig a varolista elejere kerulnek.
+  - **Elo rendszer-allapotjelzo sav (`HealthStatusBar`):** indulaskor nem-blokkolo hatterszalban ellenorzi es szinkodolva jelzi: **GPU**, **AI / Ollama**, **FFmpeg**, **Plex**.
+  - **Hardver ablak:** egy kattintassal megmutatja a teljes hardverleltart (CPU, RAM, GPU, szabad tarhely, FFmpeg, OCR, Ollama) es felkinalja az ajanlott profil alkalmazast.
+  - **Elozmenyek es felbemaradt filmek ablak:** tablazatos nezet a `series_cache.json` es `logs/processed_movies.log` alapjan, kozvetlen **Mappa** es **Folytatas** gombokkal.
+- **Halado nezet:**
+  - Teljes Whisper es LLM finomhangolas (szolgaltato, modell, blokkméret, stilus-utasitas, egyedi nevekhez **Glossary / Szoszedet**, TV sortores).
+  - Opcionalis interaktiv hang- es feliratsav-valaszto popup tobb savos MKV fajlokhoz.
+  - Beepitett **Idozites-eltolo (`+-ms`)**, **Szinkron-ellenorzo (MKV + SRT)** es **Auto-Align** gombok.
+  - **Plex API konyvtar-frissites** kapcsolat-tesztelovel.
+  - **Windows Task Scheduler** automatikus bejelentkezeskori hatterfigyelo kapcsolo (teljes kepernyos Direct3D/Vulkan jatek kozben automatikusan szunetel).
+
+---
+
+## Hibakodok, Ongyogyito Gombok es Diagnosztika
+
+Minden hiba kozertheto magyar leirassal es egyedi rovid hibakoddal jelenik meg:
+
+| Hibakod | Jelentes | 1-kattintasos ongyogyito javitas a hibaablakban |
+| :--- | :--- | :--- |
+| `ERR-OLLAMA-01` | A helyi Ollama szerver nem valaszol (`localhost:11434`) | **Ollama elinditasa most** (`ensure_ollama_running`) |
+| `ERR-MODEL-02` | A kivalasztott helyi AI modell nincs letoltve | **Modell letoltese most** (`ensure_ollama_model_pulled`) |
+| `ERR-VRAM-03` | Betelt a videokartya memoriaja (CUDA OOM) | **VRAM uritese + blokkmeret 8-ra csokkentese** |
+| `ERR-KEY-04` | Hibas vagy hianyzo felhos API kulcs (`401`/`403`) | **Atvaltas helyi Ollama modra** (`gemma3:12b`, `batch=12`) |
+| `ERR-QUOTA-05` | API kvota / sebessegkorlat tullepes (`429`) | **Atvaltas helyi Ollama modra** |
+| `ERR-FILE-06` | Fajl vagy mappa nem talalhato | Utmutatas a fajlutvonal ellenorzesehez |
+| `ERR-LOCK-07` | Fajl zarolva / jogosultsagi hiba | Utmutatas a lejatszo bezarasahoz |
+| `ERR-DISK-08` | Megtelt a hattertar | Utmutatas tárhely felszabaditasahoz |
+| `ERR-MEDIA-09` | Serult video/audio vagy hianyzo FFmpeg | Utmutatas mediafájl ellenorzesehez |
+| `ERR-GEN-99` | Egyeb varatlan hiba | Hibacsomag (`.zip`) exportalas |
+
+A **Hibacsomag (`.zip`)** gomb egyetlen kattintassal osszecsomagolja az Asztalra a `diagnostic_summary.txt`, `settings_sanitized.json` (az `llm_api_key`, `opensubtitles_api_key` es `plex_token` mezok `***REDACTED***`-re cserelve), `logs/plex_subtitler.log`, `logs/processed_movies.log`, `logs/crash_native.log`, `logs/hardware_report.json`, a legutobbi telepitesi log es a `series_cache.json` fajlokat.
+
+---
+
+## Naplozas es Hibaturo Mukodes Minden Helyzetben
+
+- **3-szintu irhato log-mappa fallback:** ha a telepitesi konyvtar irasvedett (pl. `Program Files`), a `logger.py` automatikusan tovabblep: `<app>/logs` -> `%LOCALAPPDATA%\PlexSubtitler\logs` -> `%TEMP%\PlexSubtitler\logs`, igy soha nem marad el a fajlnaplozas.
+- **Teljes kivetel- es osszeomlas-vedelem:**
+  - `sys.excepthook` es `threading.excepthook` mar a `main.py` elejen, a nehez modulok importja elott bekapcsol.
+  - `faulthandler` nativ C/CUDA osszeomlas-naplo (`logs/crash_native.log`).
+  - `_BaseCTk.report_callback_exception` feluliras: `--windowed` GUI modban a gombnyomaskori vagy timer-hibak is azonnal a `plex_subtitler.log`-ba kerulnek es megjelenik a hibaablak.
+- **Atomikus konfiguracio-mentes:** a `settings.json` ideiglenes `.tmp` + `os.replace()` muvelettel mentodik, serult JSON eseten pedig automatikusan `.corrupt.bak` biztonsagi masolat keszul.
+- **Elso inditasi auto-profilozas:** ha meg nem letezik `settings.json`, a program indulaskor automatikusan felmeri a hardvert es beallitja az optimalis profilt.
+
+---
+
+## Parancssori Hasznalat (CLI)
+
+```powershell
+# Grafikus foablak inditasa
+python main.py
+
+# Onallo 1-Click Gyors mod (Drag & Drop ablak)
+python main.py --quick
+
+# Egyetlen film vagy teljes sorozat-mappa kozvetlen feldolgozasa
+python main.py "D:\Sorozatok\S01"
+
+# Elozetes hardver- es fuggoseg-felmeres tiszta JSON kimenettel
+python main.py --hardware-scan
+
+# Rendszer-, GPU- es elo Ollama diagnosztika
+python doctor_gpu.py --live-llm
+
+# Headless hatterdaemon (kinyero + fordito egyszerre)
+python main.py --cli --app both --scan-existing
+
+# Egyszeri videofajl vagy kulso SRT forditasa
+python main.py --once "D:\Filmek\Movie.mkv"
+python main.py --translate-srt "D:\Filmek\Movie.srt"
+
+# Felirat-szinkron ellenorzese es automatikus igazitasa (Auto-Align)
+python main.py --verify-sync "D:\Filmek\Movie.mkv" "D:\Filmek\Movie.hu.srt"
+python main.py --auto-align "D:\Filmek\Movie.mkv" "D:\Filmek\Movie.hu.srt"
+
+# Kezi idozites-eltolas (+-ms) es Plex konyvtar-frissites
+python main.py --shift-srt "D:\Filmek\Movie.hu.srt" -750
+python main.py --refresh-plex "D:\Filmek\Movie.hu.srt"
+```
+
+---
+
+## Docker es NAS Futtatas
+
+Headless szerveren / NAS-on (Unraid, Synology, Linux) a gyokerben talalhato `Dockerfile` es `docker-compose.yml` segitsegevel futtathato:
+
+```bash
+cp settings.example.json settings.json
+docker compose up -d --build
+```
+
+---
+
+## Projekt Felepitese es Teszteles
 
 ```text
-/Media/Movies/
-|-- Inception (2010).mkv
-|-- Inception (2010).srt          <-- Stage 1 Output (English / Source)
-`-- Inception (2010).hu.srt       <-- Stage 2 Output (Hungarian / AI Translated)
+plex-ai-subtitler/
+├── main.py                              # Belepesi pont (GUI, --quick, --hardware-scan, CLI)
+├── doctor_gpu.py                        # Hardver-, GPU-, FFmpeg- es elo Ollama diagnosztika
+├── TELEPITO_ULTIMATE.bat                # 1-kattintasos Windows Ultimate telepito (sajat loggal)
+├── setup_ultimate.ps1                   # Hardverfelmero, teljes fuggoseg-telepito PowerShell szkript
+├── requirements.txt                     # Python fuggosegek
+├── settings.example.json                # Pelda konfiguracio (titkos kulcsok nelkul)
+├── .env.example                         # Kornyezeti valtozok sablon
+├── Dockerfile / docker-compose.yml      # Headless szerver/NAS futtatas
+├── assets/app.ico                       # Alkalmazas ikon
+├── plex_subtitler/
+│   ├── __init__.py                      # Verzio (1.3.0)
+│   ├── config.py                        # .env + atomikus settings.json + corrupt recovery
+│   ├── logger.py                        # 3-szintu fallback fájlnaplo, faulthandler, crash hooks
+│   ├── error_helper.py                  # ERR-* hibakodok, ongyogyito fixek, ZIP hibacsomag, health check
+│   ├── app1_extractor/
+│   │   ├── audio_extractor.py           # FFmpeg sav-felismeres, szoveges felirat + PGS OCR + WAV
+│   │   ├── file_processor.py            # 4-lepeses forras-pipeline
+│   │   ├── hardware_manager.py          # Teljes SystemInventory, GPU/RAM/Disk tiering, game guard, Task Scheduler
+│   │   ├── opensubtitles_client.py      # 64-bit OpenSubtitles hash es letoltes
+│   │   ├── pipeline.py                  # 1-Click es kotegelt sorozat-pipeline
+│   │   ├── series_cache.py              # Epizod-cache es uj epizod elsobbseg
+│   │   ├── transcriber.py               # faster-whisper + VRAM urites
+│   │   ├── watcher.py                   # Watchdog + PriorityQueue
+│   │   ├── gui.py                       # Foablak (Egyszeru & Halado nezet, debounced mentes)
+│   │   ├── gui_dialogs.py               # Hibaablak, ongyogyito gombok, HealthStatusBar, Hardver & Elozmenyek ablak
+│   │   └── gui_quick.py                 # Onallo 1-Click Drag & Drop ablak
+│   └── app2_translator/
+│       ├── llm_client.py                # Multi-provider LLM + Ollama auto-start/pull + rolling context
+│       ├── translator_daemon.py         # Checkpoint resume, Glossary, minoseg-ellenorzo, Plex & Toast
+│       ├── srt_parser.py                # BOM/CRLF-turo SRT parser
+│       ├── srt_formatter.py             # TV/Plex 42 kar/2 sor formazo, atfedes-javito, +-ms shift
+│       ├── sync_verifier.py             # 8000 Hz WAV RMS (NumPy) szinkron-ellenorzo es Auto-Align
+│       ├── plex_client.py               # Plex Media Server konyvtar-frissito kliens
+│       └── notifier.py                  # Windows Toast es csendes hangjelzes
+└── tests/                               # 51 automata pytest teszt (10 tesztmodul + conftest.py)
 ```
 
-Both subtitles appear in the Plex player subtitle selector without requiring library re-scans.
+### Tesztek futtatasa
 
----
-
-## Hardware Auto-Tuning Matrix
-
-The built-in `HardwareManager` scans system CUDA capabilities and configures `faster-whisper` for maximum throughput without Out-Of-Memory (OOM) errors:
-
-| Hardware Tier | Detected Hardware | Recommended Model | Device | Compute Type | Transcription Speed |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **High GPU** | NVIDIA CUDA >= 8GB VRAM | `large-v3` | `cuda` | `float16` | ~30x realtime |
-| **Mid GPU** | NVIDIA CUDA >= 4GB VRAM | `medium` | `cuda` | `float16` | ~20x realtime |
-| **Entry GPU** | NVIDIA CUDA < 4GB VRAM | `small` | `cuda` | `float16` | ~15x realtime |
-| **CPU Only** | Multi-core CPU | `small` | `cpu` | `int8` | ~3-5x realtime |
-
----
-
-## Built-in Web Dashboard
-
-For headless servers and NAS devices, Plex AI Subtitler includes a lightweight built-in web server with zero external web dependencies:
-
-- **Web Dashboard URL:** `http://localhost:8080` (or your server's LAN IP).
-- **Features:** Real-time status cards, processed file counters, active directory settings, live log viewer, and configuration editing.
-- **REST API Endpoints:**
-  - `GET /api/status`: Returns current engine state, active models, hardware configuration, and statistics.
-  - `GET /api/logs`: Returns recent log entries from the pipeline.
-  - `POST /api/config`: Updates settings remotely from any web browser or curl command.
-- **CLI Activation:** Run with `--web` or standalone via `python -m plex_subtitler.web`.
-
----
-
-## Series Memory & Character Glossary
-
-For television series, the translator automatically detects episode structures (e.g. `S01E05` or `1x05`) and manages a persistent `series_context.json` file in the show's directory:
-
-```json
-{
-  "series_title": "Severance",
-  "characters": {
-    "Mark": "tegez",
-    "Cobel": "magaz"
-  },
-  "terms": {
-    "Macrodata Refinement": "Makroadat Finomitas",
-    "Innie": "Benti",
-    "Outie": "Kinti"
-  },
-  "notes": "Hasznalj feszes, termeszetes szinkronhangnemet."
-}
+```powershell
+pytest -v
 ```
 
-This context is injected into every translation prompt, ensuring consistent address forms and terminology across the entire season.
+A tesztcsomag 51 tesztet tartalmaz (E2E CLI, konfiguracio es naplo-fallback, FFmpeg/Whisper/PGS/OpenSubtitles, sorozat-cache es prioritas, TV formazo es GPU/Ollama auto-start/pull, 8000 Hz RMS szinkron es Auto-Align, Plex API, hibakodok es ongyogyito fixek, kulcsmentesitett ZIP export, hardver-felmeres, atomikus mentes, GUI nezetvaltas es Tkinter crash-naplozas).
 
----
+## Licenc
 
-## Installation & Quick Start
-
-### 1. Prerequisites
-- Python 3.11+
-- FFmpeg (Windows: `winget install ffmpeg`, Linux: `sudo apt install ffmpeg`, macOS: `brew install ffmpeg`)
-- Optional: NVIDIA GPU with CUDA drivers
-- Optional: `ffsubsync` for automatic audio subtitle alignment (`pip install ffsubsync`)
-
-### 2. Clone & Setup
-
-```bash
-git clone https://github.com/Gyuri125/plex-ai-subtitler.git
-cd plex-ai-subtitler
-
-python -m venv .venv
-
-# Windows (PowerShell):
-.venv\Scripts\Activate.ps1
-# Windows (cmd):
-.venv\Scripts\activate.bat
-# Linux/macOS:
-source .venv/bin/activate
-
-pip install -r requirements.txt
-```
-
-### 3. Launching
-
-- **Windows Shortcut:** Double-click `inditas.bat` to launch the GUI without an open console window.
-- **Desktop GUI:**
-  ```bash
-  python -m plex_subtitler.app1_extractor.main
-  ```
-- **Headless / NAS Server Mode (with Web UI):**
-  ```bash
-  python -m plex_subtitler.app1_extractor.main --cli --web --scan-existing
-  ```
-- **Single File Test:**
-  ```bash
-  python -m plex_subtitler.app1_extractor.main --once "C:/Media/Movies/Sample.mkv"
-  ```
-
----
-
-## Standalone Executable Build & Auto-Updater
-
-The repository includes an automated Windows build script: `build_exe.bat`.
-
-Features:
-1. Executes `git pull origin main` to pull latest updates from GitHub.
-2. Updates dependencies and PyInstaller in the local virtual environment.
-3. Closes running instances of `PlexSubtitler.exe` to avoid file locks.
-4. Compiles the executable into `dist/PlexSubtitler/PlexSubtitler.exe`.
-5. Prompts to launch the updated application immediately.
-
----
-
-## Docker and NAS Support
-
-Run headless on home servers or NAS devices (Unraid, TrueNAS, Synology) via `docker-compose`:
-
-```bash
-docker-compose up -d
-```
-
-Example `docker-compose.yml`:
-```yaml
-version: "3.8"
-services:
-  plex-subtitler:
-    build: .
-    container_name: plex-ai-subtitler
-    restart: unless-stopped
-    ports:
-      - "8080:8080"
-    volumes:
-      - /path/to/media:/media:rw
-      - ./settings.json:/app/plex_subtitler/settings.json:rw
-      - ./processed_files.log:/app/plex_subtitler/processed_files.log:rw
-```
-
----
-
-## Configuration Reference
-
-Settings are stored in `plex_subtitler/settings.json` and are fully manageable via GUI, Web Dashboard, or JSON:
-
-| Setting Key | Type | Default | Description |
-| :--- | :--- | :--- | :--- |
-| `app1.watch_dirs` | `list[str]` | `[]` | Monitored directories for incoming video files. |
-| `app1.extract_embedded_subs` | `bool` | `true` | Fast extraction of subtitles embedded in MKV/MP4 files. |
-| `app1.download_online_subtitles` | `bool` | `true` | Queries OpenSubtitles by 64-bit release hash and title. |
-| `app1.auto_sync_subtitles` | `bool` | `false` | Aligns subtitles to audio speech using `ffsubsync`. |
-| `app1.quality_gate_enabled` | `bool` | `true` | Filters Whisper phantom hallucinations and repairs timestamps. |
-| `app1.web_dashboard_enabled` | `bool` | `false` | Enables built-in Web Dashboard on startup. |
-| `app1.web_dashboard_port` | `int` | `8080` | Port for the Web Dashboard interface. |
-| `app2.llm_provider` | `str` | `"google"` | Translation provider (`"google"`, `"openai"`, `"ollama"`). |
-| `app2.llm_model` | `str` | `"gemini-1.5-flash"` | Target LLM model name. |
-| `app2.use_sliding_context` | `bool` | `true` | Feeds recent lines into subsequent chunk prompts. |
-| `app2.series_memory_enabled` | `bool` | `true` | Manages `series_context.json` character glossaries. |
-| `app2.parallel_translation_workers` | `int` | `2` | Number of concurrent LLM translation worker threads. |
-| `app2.plex_auto_refresh` | `bool` | `false` | Calls Plex API to refresh libraries upon completion. |
-
----
-
-## Magyar Dokumentacio es Hasznalati Utmutato
-
-### A rendszer fo komponensei es mukodese:
-
-1. **Beagyazott feliratok kinyerese (100x gyorsulas):**
-   Ha az `.mkv` vagy `.mp4` videoban mar van angol vagy magyar feliratsav, a program 0.5 masodperc alatt kinyeri, es teljesen kihagyja a gepigenyes Whispert.
-2. **Online feliratletoltes (OpenSubtitles):**
-   A videofajl 64-bites OSdb hash-e alapjan ellenorzi az online felirat-adatbazisokat. Ha talal kesz magyar feliratot, a forditas is kihagyhato; ha angolt talal, azonnal mehet a forditohoz a Whisper STT kihagyasaval.
-3. **Quality Gate es Whisper hallucinacio-szures:**
-   Automatikusan eltavolitja az ismert fantomszovegeket (*"Thank you for watching"*, *"Please subscribe"*, zenei jelek, ismetlesi hurkok), javitja az atfedo idobelyegeket, es potolja az esetlegesen kimaradt feliratsorokat.
-4. **Auto-Sync idozites-szinkronizalas (`ffsubsync`):**
-   A felirat idobelyegeit millimasodperc-pontossaggal a video valodi beszedhangjahoz igazitja.
-5. **Gordulo kontextus-ablak (Sliding Context):**
-   A blokkok elott atadja az elozo jelenet sorait, biztositva a szinkron-stilusos tegezes/onozes es a karakterek nemenek folytonossagat.
-6. **Sorozat-memoria es karakter-szotar (`series_context.json`):**
-   Sorozatoknal automatikusan rogziti a foszereplok viszonyat es a szakkifejezeseket, igy az egesz evad nyelvezete egyseges marad.
-7. **Parhuzamositott forditas (Pipeline Throughput):**
-   Tobb concorrent szalon parhuzamosan kommunikal az LLM-mel, felezve a forditas idotartamat.
-8. **Beepitett Web Dashboard:**
-   Monitor nelkuli szervereken vagy NAS eszkozokon (port 8080) keresztul bongeszobol es mobilrol is kovetheto a folyamat.
-9. **Plex konyvtarfrissites es Push ertesitesek:**
-   Azonnali frissites a Plex API-n keresztul, valamint Discord es Telegram uzenetek.
-10. **Rendszertalca (System Tray) es Automata build script (`build_exe.bat`):**
-    Talcara rejtes es egykattintasos PyInstaller fordito.
-
----
-
-## License
-
-Distributed under the MIT License. See [LICENSE](LICENSE) for details.
+A projekt az [MIT Licenc](LICENSE) alatt erheto el.
