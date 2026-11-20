@@ -17,7 +17,10 @@ from plex_subtitler.app2_translator.llm_client import get_llm_client, translate_
 from plex_subtitler.app2_translator.plex_client import refresh_plex_library_for_file
 from plex_subtitler.app2_translator.srt_formatter import format_srt_blocks
 from plex_subtitler.app2_translator.srt_parser import SrtBlock, SrtParser
-from plex_subtitler.app2_translator.sync_verifier import evaluate_subtitle_quality
+from plex_subtitler.app2_translator.sync_verifier import (
+    evaluate_subtitle_quality,
+    find_untranslated_block_indices,
+)
 from plex_subtitler.config import (
     KNOWN_TRANSLATED_SUFFIXES,
     LOGS_DIR,
@@ -264,6 +267,59 @@ def process_single_srt(
         log.warning("⚠️ Fordítás megszakítva. Részeredmény elmentve: '%s'", target_path.name)
         _record_movie_history(srt_path, target_path, len(translated_map), total_elapsed, "RÉSZLEGES")
     else:
+        # Célzott automatikus javítókör az esetlegesen eredeti nyelven maradt sorokra
+        pre_blocks = [translated_map[b.index] for b in parser.blocks if b.index in translated_map]
+        untranslated_ids = find_untranslated_block_indices(
+            parser.blocks, pre_blocks, glossary=app2_config.glossary
+        )
+        # Akkor futtatjuk, ha van lefordítatlan gyanús sor, de nem az egész film azonos nyelvű
+        too_many_same_lang = total_blocks >= 20 and (len(untranslated_ids) / total_blocks) > 0.5
+        if untranslated_ids and not too_many_same_lang:
+            repair_ids = untranslated_ids[:30]
+            src_by_idx = {b.index: b for b in parser.blocks}
+            repair_blocks = [src_by_idx[idx] for idx in repair_ids if idx in src_by_idx]
+            log.info(
+                "🔧 Minőség-ellenőrző javítókör: %d eredeti nyelven maradt sor célzott újrafordítása...",
+                len(repair_blocks),
+            )
+            llm_client.set_recent_context(
+                f"IMPORTANT: These lines were accidentally left untranslated. "
+                f"Translate EVERY single line into natural {app2_config.target_language} and keep the exact [ID] prefix."
+            )
+            repaired_count = 0
+            for j in range(0, len(repair_blocks), 5):
+                if stop_event and stop_event.is_set():
+                    break
+                r_chunk = repair_blocks[j : j + 5]
+                r_text = SrtParser.blocks_to_text_format(r_chunk)
+                r_out = translate_blocks_with_retry(llm_client, r_text, stop_event=stop_event)
+                if not r_out:
+                    continue
+                fixed_blocks = SrtParser.apply_translation_to_blocks(r_chunk, r_out)
+                for orig_b, fixed_b in zip(r_chunk, fixed_blocks):
+                    if " ".join(fixed_b.text.split()).lower() != " ".join(orig_b.text.split()).lower():
+                        translated_map[fixed_b.index] = fixed_b
+                        repaired_count += 1
+            if repaired_count > 0:
+                repaired_ordered = [
+                    translated_map[b.index] for b in parser.blocks if b.index in translated_map
+                ]
+                if app2_config.format_tv_subtitles:
+                    repaired_ordered = format_srt_blocks(
+                        repaired_ordered,
+                        max_chars=app2_config.max_chars_per_line,
+                        max_lines=app2_config.max_lines_per_block,
+                    )
+                SrtParser.save_srt(repaired_ordered, target_path)
+                log.info(
+                    "✅ Automatikus javítókör kész: %d/%d sor sikeresen kijavítva.",
+                    repaired_count,
+                    len(repair_blocks),
+                )
+            else:
+                log.info("ℹ️ Javítókör lefutott, a megjelölt sorok változatlanok maradtak.")
+
+        total_elapsed = time.time() - start_time
         log.info("============================================================")
         log.info(
             "🎉 BEFEJEZÉSI ÖSSZEGZÉS | Film: '%s' | Blokkok: %d/%d | Modell: %s/%s | Idő: %.1f mp | Kimenet: '%s'",

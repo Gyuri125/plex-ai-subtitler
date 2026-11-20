@@ -31,7 +31,7 @@
   4. `faster-whisper` GPU/CPU speech-to-text transcription with automatic commentary-track avoidance and VRAM unloading before local LLM inference.
 - **Context-Aware LLM Translation & TV/Plex Formatting:**
   - Supports **100% local Ollama** (auto-starts `ollama serve`, auto-pulls missing models, dynamic `keep_alive`) as well as **Google Gemini, OpenAI, Groq, DeepSeek, and OpenRouter**.
-  - Automatic rolling movie-context prompt injection, custom character Glossary, checkpointed crash-safe resume (`.part` recovery), TV/Plex 42-char / 2-line wrapping, overlap fixing, and quality metrics (`%`).
+  - Automatic rolling movie-context prompt injection, custom character Glossary, checkpointed crash-safe resume (`.part` recovery), automatic targeted repair pass for accidentally untranslated lines, TV/Plex 42-char / 2-line wrapping, overlap fixing, and quality metrics (`%`).
 - **Real Audio-to-Subtitle Sync Verification & Auto-Align:**
   - Measures true 8000 Hz WAV speech energy (RMS, vectorized with NumPy) against SRT timestamps and automatically corrects uniform drift within `+-3000 ms`.
 - **Upfront Hardware Profiling & Ultimate Windows Installer:**
@@ -236,7 +236,7 @@ plex-ai-subtitler/
 │       ├── srt_formatter.py             # TV/Plex 42 kar/2 sor formazo, atfedes-javito, +-ms shift
 │       ├── sync_verifier.py             # 8000 Hz WAV RMS (NumPy) szinkron-ellenorzo es Auto-Align
 │       └── plex_client.py               # Plex Media Server konyvtar-frissito kliens
-└── tests/                               # 51 automata pytest teszt (10 tesztmodul + conftest.py)
+└── tests/                               # 52 automata pytest teszt (10 tesztmodul + conftest.py)
 ```
 
 ### Tesztek futtatasa
@@ -245,7 +245,7 @@ plex-ai-subtitler/
 pytest -v
 ```
 
-A tesztcsomag 51 tesztet tartalmaz (E2E CLI, konfiguracio es naplo-fallback, FFmpeg/Whisper/PGS/OpenSubtitles, sorozat-cache es prioritas, TV formazo es GPU/Ollama auto-start/pull, 8000 Hz RMS szinkron es Auto-Align, Plex API, hibakodok es ongyogyito fixek, kulcsmentesitett ZIP export, hardver-felmeres, atomikus mentes, GUI nezetvaltas es Tkinter crash-naplozas).
+A tesztcsomag 52 tesztet tartalmaz (E2E CLI, konfiguracio es naplo-fallback, FFmpeg/Whisper/PGS/OpenSubtitles, sorozat-cache es prioritas, TV formazo es GPU/Ollama auto-start/pull, celzott leforditatlan-sor javitokor, 8000 Hz RMS szinkron es Auto-Align, Plex API, hibakodok es ongyogyito fixek, kulcsmentesitett ZIP export, hardver-felmeres, atomikus mentes, GUI nezetvaltas es Tkinter crash-naplozas).
 
 ## Licenc
 

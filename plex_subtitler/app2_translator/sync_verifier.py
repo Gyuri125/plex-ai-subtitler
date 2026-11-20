@@ -427,6 +427,34 @@ class QualityReport:
     speech_alignment_ratio: float | None
     score_pct: int
     summary_line: str
+    untranslated_indices: list[int] = field(default_factory=list)
+
+
+def find_untranslated_block_indices(
+    source_blocks: list[SrtBlock],
+    translated_blocks: list[SrtBlock],
+    glossary: dict[str, str] | None = None,
+) -> list[int]:
+    """Visszaadja azon blokkok indexeit, amelyek valószínűleg az eredeti nyelven maradtak."""
+    src_by_idx = {b.index: b.text for b in source_blocks}
+    same_glossary = {
+        k.strip().lower()
+        for k, v in (glossary or {}).items()
+        if k.strip().lower() == v.strip().lower()
+    }
+    flagged: list[int] = []
+    for blk in translated_blocks:
+        tr_clean = " ".join(blk.text.split())
+        src_clean = " ".join(src_by_idx.get(blk.index, "").split())
+        if (
+            src_clean
+            and len(tr_clean) >= 6
+            and any(ch.isalpha() for ch in tr_clean)
+            and tr_clean.lower() == src_clean.lower()
+            and tr_clean.lower() not in same_glossary
+        ):
+            flagged.append(blk.index)
+    return flagged
 
 
 def evaluate_subtitle_quality(
@@ -447,27 +475,17 @@ def evaluate_subtitle_quality(
             speech_alignment_ratio=speech_alignment_ratio,
             score_pct=0,
             summary_line="📊 Minőség: 0% (üres felirat)",
+            untranslated_indices=[],
         )
 
-    src_by_idx = {b.index: b.text for b in source_blocks}
-    same_glossary = {k.strip().lower() for k, v in (glossary or {}).items() if k.strip().lower() == v.strip().lower()}
-
-    untranslated = 0
+    untranslated_ids = find_untranslated_block_indices(
+        source_blocks, translated_blocks, glossary=glossary
+    )
+    untranslated = len(untranslated_ids)
     line_lengths: list[int] = []
     over_limit = 0
 
     for blk in translated_blocks:
-        tr_clean = " ".join(blk.text.split())
-        src_clean = " ".join(src_by_idx.get(blk.index, "").split())
-        if (
-            src_clean
-            and len(tr_clean) >= 6
-            and any(ch.isalpha() for ch in tr_clean)
-            and tr_clean.lower() == src_clean.lower()
-            and tr_clean.lower() not in same_glossary
-        ):
-            untranslated += 1
-
         for raw_line in blk.text.splitlines():
             line_len = len(raw_line.strip())
             line_lengths.append(line_len)
@@ -501,4 +519,5 @@ def evaluate_subtitle_quality(
         speech_alignment_ratio=speech_alignment_ratio,
         score_pct=score,
         summary_line=summary,
+        untranslated_indices=untranslated_ids,
     )

@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
     Plex AI Subtitler Ultimate Telepito — 100%-ban automata, szuz Windows gepre keszitett telepito.
 .DESCRIPTION
