@@ -1,16 +1,24 @@
 ﻿<#
 .SYNOPSIS
-    Plex Subtitler Ultimate Telepito — elozetes hardver-felmeressel, teljes fuggoseg-telepitessel es reszletes naplozassal.
+    Plex AI Subtitler Ultimate Telepito — 100%-ban automata, szuz Windows gepre keszitett telepito.
 .DESCRIPTION
-    - 0. lepesben felmeri a gep hardveret (OS, CPU, RAM, NVIDIA GPU/VRAM/driver, szabad tarhely, internet)
-      es dinamikusan kivalasztja az optimalis profilt (CUDA_ULTRA / CUDA_MID / CUDA_ENTRY / CPU_ONLY).
-    - Elore feltelepiti az osszes szukseges fuggoseget:
-      VC++ Redistributable (x64), Python 3.12, FFmpeg/ffprobe, Tesseract OCR, Ollama + hardverhez illo modell,
-      uv + .venv + PyTorch (CUDA vagy CPU) + requirements.txt + PyInstaller.
-    - Minden lepesrol es fuggosegrol reszletes logot ir: logs\install_ultimate_YYYYMMDD_HHMMSS.log
-      es menti a hardver-riportot: logs\hardware_report.json.
-    - Lefuttatja a pytest teszteket, a doctor_gpu.py diagnosztikat, leforditja a PlexSubtitler.exe-t az 1.1 mappaba,
-      es letrehozza az asztali parancsikonokat (opcionalisan a Task Scheduler hatterfigyelot is).
+    - Nem igenyel elore telepitett LM Studio-t, llama.cpp-t, Ollama-t, Python-t, FFmpeg-et vagy Tesseract-ot.
+    - 0. lepesben elozetes hardver- es internet-felmerest vegez (OS, CPU, RAM, NVIDIA GPU/VRAM/driver, tarhely)
+      es dinamikusan kivalasztja a legjobb profilt (CUDA_ULTRA / CUDA_MID / CUDA_ENTRY / CPU_ONLY).
+    - Elore feltelepiti es beallitja az OSSZES szukseges komponenst:
+      1. Visual C++ Redistributable (x64)
+      2. Python 3.12 (WindowsApps MS Store stub kiszuresevel, winget + python.org fallback)
+      3. FFmpeg + ffprobe
+      4. Tesseract OCR (Blu-ray PGS kepfeliratokhoz)
+      5. Ollama (beepitett CUDA llama.cpp motor, winget + OllamaSetup.exe /VERYSILENT fallback,
+         OLLAMA_FLASH_ATTENTION=1, automata szerver-inditas es modell letoltes)
+      6. uv + .venv + PyTorch (CUDA cu124 + cuBLAS/cuDNN vagy CPU) + requirements.txt + PyInstaller
+      6b. Whisper modell elotoltese a helyi cache-be (hogy az elso film is azonnal induljon!)
+      7. Hardverhez hangolt settings.json (tiszta UTF-8, BOM nelkul)
+      8. Teljes 51-tesztes pytest + elo GPU/Ollama probaforditas (doctor_gpu.py --live-llm)
+      9. Onallo PlexSubtitler.exe leforditasa
+      10. Asztali parancsikonok es opcionalis Windows Task Scheduler hatterfigyelo
+    - Minden lepesrol reszletes log keszul: logs\install_ultimate_YYYYMMDD_HHMMSS.log es logs\hardware_report.json.
 #>
 
 param(
@@ -19,10 +27,16 @@ param(
     [switch]$EnableAutostart,
     [string[]]$WatchDirs = @(),
     [switch]$SkipTests,
-    [switch]$SkipBuild
+    [switch]$SkipBuild,
+    [switch]$SkipWhisperPrefetch
 )
 
 $ErrorActionPreference = "Stop"
+
+# Windows 10 PowerShell 5.1 TLS 1.2 kotelezo a GitHub / Python / Ollama letoltesekhez!
+try {
+    [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+} catch {}
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $ScriptDir
@@ -45,6 +59,8 @@ Start-Transcript -Path $InstallLog -Append | Out-Null
 
 $StepReport = [System.Collections.Generic.List[PSCustomObject]]::new()
 $ExitCode = 0
+$ResolvedPythonExe = $null
+$ResolvedOllamaExe = $null
 
 function Add-StepResult {
     param([string]$Step, [string]$Status, [string]$Detail)
@@ -55,6 +71,12 @@ function Add-StepResult {
     })
 }
 
+function Write-Utf8NoBom {
+    param([string]$Path, [string]$Content)
+    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+    [System.IO.File]::WriteAllText($Path, $Content, $utf8NoBom)
+}
+
 function Refresh-ProcessPath {
     $machinePath = [System.Environment]::GetEnvironmentVariable("PATH", "Machine")
     $userPath = [System.Environment]::GetEnvironmentVariable("PATH", "User")
@@ -62,10 +84,52 @@ function Refresh-ProcessPath {
         "$env:LOCALAPPDATA\Programs\Ollama",
         "$env:LOCALAPPDATA\Programs\Python\Python312",
         "$env:LOCALAPPDATA\Programs\Python\Python312\Scripts",
+        "C:\Program Files\Python312",
+        "C:\Program Files\Python312\Scripts",
         "C:\Program Files\Tesseract-OCR",
         "$env:LOCALAPPDATA\Microsoft\WinGet\Links"
     ) -join ";"
     $env:PATH = "$machinePath;$userPath;$extras"
+}
+
+function Find-RealPython {
+    Refresh-ProcessPath
+    $candidates = @()
+    foreach ($c in (Get-Command python -All -ErrorAction SilentlyContinue)) {
+        if ($c.Source -and ($c.Source -notlike "*\WindowsApps\*")) {
+            $candidates += $c.Source
+        }
+    }
+    $candidates += @(
+        "$env:LOCALAPPDATA\Programs\Python\Python312\python.exe",
+        "C:\Program Files\Python312\python.exe",
+        "$env:LOCALAPPDATA\Programs\Python\Python311\python.exe",
+        "C:\Program Files\Python311\python.exe"
+    )
+    foreach ($exe in ($candidates | Select-Object -Unique)) {
+        if ($exe -and (Test-Path $exe)) {
+            $verStr = (& $exe --version 2>&1) -join " "
+            if ($LASTEXITCODE -eq 0 -and $verStr -match "Python 3\.(1[1-9]|[2-9][0-9])") {
+                return @{ Exe = $exe; Version = $verStr }
+            }
+        }
+    }
+    return $null
+}
+
+function Find-OllamaExe {
+    Refresh-ProcessPath
+    $cmd = Get-Command ollama -ErrorAction SilentlyContinue
+    if ($cmd -and $cmd.Source -and (Test-Path $cmd.Source)) {
+        return $cmd.Source
+    }
+    foreach ($p in @(
+        "$env:LOCALAPPDATA\Programs\Ollama\ollama.exe",
+        "C:\Program Files\Ollama\ollama.exe"
+    )) {
+        if (Test-Path $p) { return $p }
+    }
+    return $null
 }
 
 function Invoke-CheckedStep {
@@ -92,7 +156,6 @@ function Invoke-CheckedStep {
     }
 }
 
-# Dinamikus hardverprofil valtozok (0. lepes tolti ki)
 $HwProfile = [ordered]@{
     tier            = "CPU_ONLY"
     use_cuda        = $false
@@ -115,14 +178,20 @@ $HwProfile = [ordered]@{
 
 try {
     Write-Host "================================================================" -ForegroundColor Magenta
-    Write-Host "   PLEX SUBTITLER v1.3.0 — ULTIMATE TELEPITO ES HARDVERFELMERO" -ForegroundColor Magenta
+    Write-Host "   PLEX AI SUBTITLER v1.3.0 — ULTIMATE TELEPITO (ZERO-CONFIG)" -ForegroundColor Magenta
     Write-Host "   Naplo: $InstallLog" -ForegroundColor Gray
     Write-Host "================================================================" -ForegroundColor Magenta
 
     # ------------------------------------------------------------------
-    # 0. LEPES: ELOZETES HARDVER- ES RENDSZERFELMERES
+    # 0. LEPES: ELOZETES HARDVER-, TARHELY- ES INTERNET-FELMERES
     # ------------------------------------------------------------------
-    Invoke-CheckedStep -StepName "0. Elozetes hardver- es rendszerfelmeres" -Action {
+    Invoke-CheckedStep -StepName "0. Elozetes hardver-, tarhely- es internet-felmeres" -Action {
+        try {
+            $null = Invoke-WebRequest -Uri "https://pypi.org" -Method Head -TimeoutSec 8 -UseBasicParsing
+        } catch {
+            Write-Host "  [FIGYELEM] Internet-ellenorzes sikertelen (pypi.org): folytatas, de uj letolteshez internet kell!" -ForegroundColor Yellow
+        }
+
         $os = Get-CimInstance Win32_OperatingSystem
         $cpu = Get-CimInstance Win32_Processor | Select-Object -First 1
         $cs = Get-CimInstance Win32_ComputerSystem
@@ -137,7 +206,6 @@ try {
         $disk = Get-PSDrive -Name $driveLetter
         $HwProfile.disk_free_gb = [math]::Round($disk.Free / 1GB, 1)
 
-        # NVIDIA GPU + VRAM detektalas nvidia-smi segitsegevel
         $smiCmd = Get-Command nvidia-smi -ErrorAction SilentlyContinue
         if (-not $smiCmd -and (Test-Path "C:\Windows\System32\nvidia-smi.exe")) {
             $smiCmd = "C:\Windows\System32\nvidia-smi.exe"
@@ -156,7 +224,6 @@ try {
             }
         }
 
-        # Profil kivalasztasa a mert hardver (vagy -ForceProfile) alapjan
         $chosenTier = $ForceProfile
         if ($chosenTier -eq "AUTO") {
             if ($HwProfile.vram_gb -ge 11.0) {
@@ -213,14 +280,14 @@ try {
         Write-Host "  Szabad tarhely: $($HwProfile.disk_free_gb) GB ($driveLetter`:)"
         Write-Host "  Valasztott AI:  $($HwProfile.tier) -> Whisper=$($HwProfile.whisper_model) ($($HwProfile.whisper_device)), Ollama=$($HwProfile.ollama_model), batch=$($HwProfile.batch_size)" -ForegroundColor Yellow
 
-        $minDisk = if ($HwProfile.tier -eq "CUDA_ULTRA") { 18.0 } elseif ($HwProfile.use_cuda) { 12.0 } else { 7.0 }
+        $minDisk = if ($HwProfile.tier -eq "CUDA_ULTRA") { 20.0 } elseif ($HwProfile.use_cuda) { 14.0 } else { 8.0 }
         if ($HwProfile.disk_free_gb -lt $minDisk) {
             Write-Host "  [FIGYELEM] Keves szabad tarhely ($($HwProfile.disk_free_gb) GB < ajanlott $minDisk GB)!" -ForegroundColor Yellow
         }
 
         $hwJson = $HwProfile | ConvertTo-Json -Depth 4
-        Set-Content -Path (Join-Path $LogsDir "hardware_report.json") -Value $hwJson -Encoding UTF8
-        Set-Content -Path (Join-Path $ReleaseLogsDir "hardware_report.json") -Value $hwJson -Encoding UTF8
+        Write-Utf8NoBom -Path (Join-Path $LogsDir "hardware_report.json") -Content $hwJson
+        Write-Utf8NoBom -Path (Join-Path $ReleaseLogsDir "hardware_report.json") -Content $hwJson
 
         return "$($HwProfile.tier) | GPU=$($HwProfile.gpu_name) ($($HwProfile.vram_gb) GB) | RAM=$($HwProfile.ram_total_gb) GB | Szabad=$($HwProfile.disk_free_gb) GB"
     }
@@ -234,11 +301,13 @@ try {
             return "Mar telepitve (vcruntime140_1.dll jelen van)"
         }
         if (Get-Command winget -ErrorAction SilentlyContinue) {
-            winget install --id Microsoft.VCRedist.2015+.x64 -e --silent --accept-source-agreements --accept-package-agreements
+            try {
+                winget install --id Microsoft.VCRedist.2015+.x64 -e --silent --accept-source-agreements --accept-package-agreements
+            } catch {}
         }
         if (-not (Test-Path $vcDll)) {
             $vcSetup = Join-Path $env:TEMP "vc_redist.x64.exe"
-            Invoke-WebRequest -Uri "https://aka.ms/vs/17/release/vc_redist.x64.exe" -OutFile $vcSetup
+            Invoke-WebRequest -Uri "https://aka.ms/vs/17/release/vc_redist.x64.exe" -OutFile $vcSetup -UseBasicParsing
             Start-Process -FilePath $vcSetup -ArgumentList "/install /quiet /norestart" -Wait
         }
         if (Test-Path $vcDll) { return "VC++ 2015-2022 (x64) sikeresen telepitve" }
@@ -246,34 +315,30 @@ try {
     }
 
     # ------------------------------------------------------------------
-    # 2. LEPES: PYTHON 3.12 ELLENORZESE / AUTOMATA TELEPITESE
+    # 2. LEPES: PYTHON 3.12 ELLENORZESE / AUTOMATA TELEPITESE (STUB-VEDELEMMEL)
     # ------------------------------------------------------------------
-    Invoke-CheckedStep -StepName "2. Python 3.11+ ellenorzese / automata telepitese" -Action {
-        Refresh-ProcessPath
-        $pyCmd = Get-Command python -ErrorAction SilentlyContinue
-        $needInstall = $true
-        if ($pyCmd) {
-            $verStr = (& python --version 2>&1) -join " "
-            if ($LASTEXITCODE -eq 0 -and $verStr -match "Python 3\.(1[1-9]|[2-9][0-9])") {
-                $needInstall = $false
-                return $verStr
-            }
-        }
-        if ($needInstall) {
+    Invoke-CheckedStep -StepName "2. Python 3.12 ellenorzese / automata telepitese" -Action {
+        $found = Find-RealPython
+        if (-not $found) {
             if (Get-Command winget -ErrorAction SilentlyContinue) {
-                winget install --id Python.Python.3.12 -e --silent --accept-source-agreements --accept-package-agreements
-            } else {
-                $pySetup = Join-Path $env:TEMP "python-3.12.7-amd64.exe"
-                Invoke-WebRequest -Uri "https://www.python.org/ftp/python/3.12.7/python-3.12.7-amd64.exe" -OutFile $pySetup
-                Start-Process -FilePath $pySetup -ArgumentList "/quiet InstallAllUsers=0 PrependPath=1 Include_test=0" -Wait
+                try {
+                    winget install --id Python.Python.3.12 -e --silent --accept-source-agreements --accept-package-agreements
+                } catch {}
+                $found = Find-RealPython
             }
-            Refresh-ProcessPath
-            $verStr = (& python --version 2>&1) -join " "
-            if ($LASTEXITCODE -ne 0) {
-                throw "Python 3.12 telepites utan sem erheto el a PATH-ban. Inditsd ujra a terminalt es futtasd ujra!"
-            }
-            return "Telepitve: $verStr"
         }
+        if (-not $found) {
+            Write-Host "  Hivatalos Python 3.12 telepito letoltese (python.org)..." -ForegroundColor Gray
+            $pySetup = Join-Path $env:TEMP "python-3.12.7-amd64.exe"
+            Invoke-WebRequest -Uri "https://www.python.org/ftp/python/3.12.7/python-3.12.7-amd64.exe" -OutFile $pySetup -UseBasicParsing
+            Start-Process -FilePath $pySetup -ArgumentList "/quiet InstallAllUsers=0 PrependPath=1 Include_test=0" -Wait
+            $found = Find-RealPython
+        }
+        if (-not $found) {
+            throw "Python 3.12 telepites utan sem talalhato. Inditsd ujra a gepet/ablakot es futtasd ujra!"
+        }
+        $script:ResolvedPythonExe = $found.Exe
+        return "$($found.Version) ($($found.Exe))"
     }
 
     # ------------------------------------------------------------------
@@ -283,7 +348,9 @@ try {
         Refresh-ProcessPath
         if (-not (Get-Command ffmpeg -ErrorAction SilentlyContinue)) {
             if (Get-Command winget -ErrorAction SilentlyContinue) {
-                winget install --id Gyan.FFmpeg -e --silent --accept-source-agreements --accept-package-agreements
+                try {
+                    winget install --id Gyan.FFmpeg -e --silent --accept-source-agreements --accept-package-agreements
+                } catch {}
                 Refresh-ProcessPath
             }
         }
@@ -309,13 +376,14 @@ try {
             if (-not (Test-Path $tessExe)) {
                 $tessUrl = "https://github.com/UB-Mannheim/tesseract/releases/download/v5.4.0.20240606/tesseract-ocr-w64-setup-5.4.0.20240606.exe"
                 $tessSetup = Join-Path $env:TEMP "tesseract-setup.exe"
-                Invoke-WebRequest -Uri $tessUrl -OutFile $tessSetup
+                Invoke-WebRequest -Uri $tessUrl -OutFile $tessSetup -UseBasicParsing
                 Start-Process -FilePath $tessSetup -ArgumentList "/S" -Wait
             }
         }
         if (Test-Path $tessDir) {
             if ($env:PATH -notlike "*$tessDir*") { $env:PATH = "$env:PATH;$tessDir" }
             $userPath = [System.Environment]::GetEnvironmentVariable("PATH", "User")
+            if (-not $userPath) { $userPath = "" }
             if ($userPath -notlike "*$tessDir*") {
                 [System.Environment]::SetEnvironmentVariable("PATH", ($userPath.TrimEnd(";") + ";$tessDir"), "User")
             }
@@ -330,22 +398,42 @@ try {
     }
 
     # ------------------------------------------------------------------
-    # 5. LEPES: OLLAMA TELEPITESE, INDITASA ES MODELL LETOLTESE
+    # 5. LEPES: OLLAMA (BEEPITETT CUDA LLAMA.CPP MOTOR) + MODELL LETOLTESE
+    #    (Nem kell LM Studio vagy kezi llama.cpp!)
     # ------------------------------------------------------------------
-    Invoke-CheckedStep -StepName "5. Ollama telepitese es $($HwProfile.ollama_model) letoltese" -Action {
-        Refresh-ProcessPath
-        if (-not (Get-Command ollama -ErrorAction SilentlyContinue)) {
+    Invoke-CheckedStep -StepName "5. Helyi AI motor (Ollama) telepitese es $($HwProfile.ollama_model) letoltese" -Action {
+        # Flash Attention bekapcsolasa a gyorsabb, kisebb VRAM-igenyu 12B futtatasert
+        $env:OLLAMA_FLASH_ATTENTION = "1"
+        [System.Environment]::SetEnvironmentVariable("OLLAMA_FLASH_ATTENTION", "1", "User")
+
+        $ollamaExe = Find-OllamaExe
+        if (-not $ollamaExe) {
             if (Get-Command winget -ErrorAction SilentlyContinue) {
-                winget install --id Ollama.Ollama -e --silent --accept-source-agreements --accept-package-agreements
-            } else {
-                $setupExe = Join-Path $env:TEMP "OllamaSetup.exe"
-                Invoke-WebRequest -Uri "https://ollama.com/download/OllamaSetup.exe" -OutFile $setupExe
-                Start-Process -FilePath $setupExe -ArgumentList "/S" -Wait
+                try {
+                    winget install --id Ollama.Ollama -e --silent --accept-source-agreements --accept-package-agreements
+                } catch {}
+                $ollamaExe = Find-OllamaExe
             }
-            Refresh-ProcessPath
         }
-        if (-not (Get-Command ollama -ErrorAction SilentlyContinue)) {
-            throw "Ollama binaris telepites utan sem erheto el."
+        if (-not $ollamaExe) {
+            Write-Host "  Hivatalos Ollama telepito letoltese (ollama.com)..." -ForegroundColor Gray
+            $setupExe = Join-Path $env:TEMP "OllamaSetup.exe"
+            Invoke-WebRequest -Uri "https://ollama.com/download/OllamaSetup.exe" -OutFile $setupExe -UseBasicParsing
+            # Ollama Windows installer Inno Setup alapu -> /VERYSILENT /SUPPRESSMSGBOXES /NORESTART
+            Start-Process -FilePath $setupExe -ArgumentList "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART" -Wait
+            $ollamaExe = Find-OllamaExe
+        }
+        if (-not $ollamaExe) {
+            throw "Ollama telepites utan sem talalhato ($env:LOCALAPPDATA\Programs\Ollama\ollama.exe)."
+        }
+        $script:ResolvedOllamaExe = $ollamaExe
+
+        # Ollama mappa felvetele a User PATH-ba, hogy barmely uj ablakbol elerheto legyen
+        $ollamaDir = Split-Path -Parent $ollamaExe
+        $userPath = [System.Environment]::GetEnvironmentVariable("PATH", "User")
+        if (-not $userPath) { $userPath = "" }
+        if ($userPath -notlike "*$ollamaDir*") {
+            [System.Environment]::SetEnvironmentVariable("PATH", ($userPath.TrimEnd(";") + ";$ollamaDir"), "User")
         }
 
         $up = $false
@@ -353,8 +441,8 @@ try {
             Invoke-RestMethod -Uri "http://localhost:11434/api/tags" -TimeoutSec 2 | Out-Null
             $up = $true
         } catch {
-            Start-Process -FilePath "ollama" -ArgumentList "serve" -WindowStyle Hidden
-            for ($i = 0; $i -lt 25; $i++) {
+            Start-Process -FilePath $ollamaExe -ArgumentList "serve" -WindowStyle Hidden
+            for ($i = 0; $i -lt 30; $i++) {
                 Start-Sleep -Seconds 1
                 try {
                     Invoke-RestMethod -Uri "http://localhost:11434/api/tags" -TimeoutSec 2 | Out-Null
@@ -366,42 +454,61 @@ try {
         if (-not $up) { throw "Ollama szerver nem indult el a 11434 porton." }
 
         $targetModel = $HwProfile.ollama_model
-        & ollama pull $targetModel
+        Write-Host "  Helyi AI modell letoltese: $targetModel (ez elso alkalommal par percet vehet igenybe)..." -ForegroundColor Gray
+        & $ollamaExe pull $targetModel
         if ($LASTEXITCODE -ne 0) { throw "ollama pull $targetModel sikertelen." }
-        $ollamaVer = (& ollama --version 2>&1) -join " "
-        return "$ollamaVer | modell kesz: $targetModel"
+        $ollamaVer = (& $ollamaExe --version 2>&1) -join " "
+        return "$ollamaVer | modell kesz: $targetModel (LM Studio / llama.cpp nem szukseges)"
     }
 
     # ------------------------------------------------------------------
     # 6. LEPES: UV + .VENV + PYTORCH (CUDA VAGY CPU) + REQUIREMENTS
     # ------------------------------------------------------------------
     Invoke-CheckedStep -StepName "6. Python .venv, PyTorch ($($HwProfile.tier)) es osszes fuggoseg telepitese" -Action {
-        if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
-            python -m pip install --upgrade uv
-            if ($LASTEXITCODE -ne 0) { throw "uv telepites sikertelen." }
-            Refresh-ProcessPath
-        }
+        $pyExe = $script:ResolvedPythonExe
+        if (-not $pyExe) { throw "Nincs feloldott Python 3.12 binaris." }
+
+        & $pyExe -m pip install --upgrade pip uv
+        if ($LASTEXITCODE -ne 0) { throw "uv telepites sikertelen." }
+
         if (-not (Test-Path ".venv")) {
-            uv venv .venv --python 3.12
+            & $pyExe -m uv venv .venv --python $pyExe
             if ($LASTEXITCODE -ne 0) { throw ".venv letrehozas sikertelen." }
         }
 
+        $venvPy = Join-Path $ScriptDir ".venv\Scripts\python.exe"
         if ($HwProfile.use_cuda) {
-            uv pip install --python .venv\Scripts\python.exe --index-url https://download.pytorch.org/whl/cu124 torch
+            & $pyExe -m uv pip install --python $venvPy --index-url https://download.pytorch.org/whl/cu124 torch
             if ($LASTEXITCODE -ne 0) { throw "PyTorch cu124 telepites sikertelen." }
-            uv pip install --python .venv\Scripts\python.exe nvidia-cublas-cu12 nvidia-cudnn-cu12
+            & $pyExe -m uv pip install --python $venvPy nvidia-cublas-cu12 nvidia-cudnn-cu12
             if ($LASTEXITCODE -ne 0) { throw "NVIDIA CUDA runtime csomagok telepitese sikertelen." }
         } else {
-            uv pip install --python .venv\Scripts\python.exe torch
+            & $pyExe -m uv pip install --python $venvPy torch
             if ($LASTEXITCODE -ne 0) { throw "PyTorch CPU telepites sikertelen." }
         }
 
-        uv pip install --python .venv\Scripts\python.exe -r requirements.txt pyinstaller
+        & $pyExe -m uv pip install --python $venvPy -r requirements.txt pyinstaller
         if ($LASTEXITCODE -ne 0) { throw "requirements.txt telepites sikertelen." }
 
-        $pkgCheck = & .venv\Scripts\python.exe -c "import torch, faster_whisper, customtkinter, imageio_ffmpeg, watchdog, google.genai, openai, requests, tkinterdnd2, pgsrip, pytesseract, numpy, PyInstaller; print('torch=' + torch.__version__ + ', cuda=' + str(torch.cuda.is_available()))"
+        $pkgCheck = & $venvPy -c "import torch, faster_whisper, customtkinter, imageio_ffmpeg, watchdog, google.genai, openai, requests, tkinterdnd2, pgsrip, pytesseract, numpy, PyInstaller; print('torch=' + torch.__version__ + ', cuda=' + str(torch.cuda.is_available()))"
         if ($LASTEXITCODE -ne 0) { throw "Fuggoseg-import ellenorzes sikertelen." }
         return $pkgCheck
+    }
+
+    # ------------------------------------------------------------------
+    # 6b. LEPES: WHISPER MODELL ELOTOLTESE (AZONNALI ELSO FUTASHOZ)
+    # ------------------------------------------------------------------
+    if (-not $SkipWhisperPrefetch) {
+        Invoke-CheckedStep -StepName "6b. Whisper modell elotoltese ($($HwProfile.whisper_model))" -Optional -Action {
+            $venvPy = Join-Path $ScriptDir ".venv\Scripts\python.exe"
+            $wModel = $HwProfile.whisper_model
+            Write-Host "  Whisper '$wModel' hangfelismero modell letoltese a helyi gyorsitotarba..." -ForegroundColor Gray
+            $dlPath = & $venvPy -c "from faster_whisper import download_model; print(download_model('$wModel'))"
+            if ($LASTEXITCODE -ne 0) { throw "Whisper modell elotoltese sikertelen (elso futaskor ujra megprobalja)." }
+            return "Whisper '$wModel' elotoltve: $dlPath"
+        }
+    } else {
+        Add-StepResult -Step "6b. Whisper modell elotoltese" -Status "KIHAGYVA" -Detail "-SkipWhisperPrefetch kapcsoloval"
     }
 
     # ------------------------------------------------------------------
@@ -478,7 +585,7 @@ try {
             if (Test-Path $cfgPath) {
                 Copy-Item -Path $cfgPath -Destination "$cfgPath.pre_install.bak" -Force
             }
-            Set-Content -Path $cfgPath -Value $SettingsContent -Encoding UTF8
+            Write-Utf8NoBom -Path $cfgPath -Content $SettingsContent
         }
         return "settings.json mentve (Whisper=$($HwProfile.whisper_model)/$($HwProfile.whisper_device), Ollama=$($HwProfile.ollama_model), batch=$($HwProfile.batch_size))"
     }
@@ -488,11 +595,12 @@ try {
     # ------------------------------------------------------------------
     if (-not $SkipTests) {
         Invoke-CheckedStep -StepName "8. Automata pytest es elo hardver+Ollama diagnosztika" -Action {
-            & .venv\Scripts\python.exe -m pytest -v
+            $venvPy = Join-Path $ScriptDir ".venv\Scripts\python.exe"
+            & $venvPy -m pytest -v
             if ($LASTEXITCODE -ne 0) { throw "pytest sikertelen." }
-            & .venv\Scripts\python.exe doctor_gpu.py --live-llm
+            & $venvPy doctor_gpu.py --live-llm
             if ($LASTEXITCODE -ne 0) { throw "doctor_gpu.py hibat jelzett." }
-            return "Minden pytest teszt es elo Ollama proba sikeres"
+            return "Minden pytest teszt es elo Ollama probaforditas sikeres"
         }
     } else {
         Add-StepResult -Step "8. Automata pytest es diagnosztika" -Status "KIHAGYVA" -Detail "-SkipTests kapcsoloval"
@@ -519,7 +627,7 @@ try {
             }
             $pyiArgs += "main.py"
 
-            & .venv\Scripts\pyinstaller.exe @pyiArgs
+            & (Join-Path $ScriptDir ".venv\Scripts\pyinstaller.exe") @pyiArgs
             if ($LASTEXITCODE -ne 0) { throw "PyInstaller build sikertelen." }
 
             if (Test-Path (Join-Path $ReleaseDir "_internal")) {
@@ -553,7 +661,7 @@ try {
         $FullShortcut.TargetPath = $ExePath
         $FullShortcut.WorkingDirectory = $ReleaseDir
         $FullShortcut.IconLocation = "$ExePath,0"
-        $FullShortcut.Description = "Plex Subtitler teljes vezerlopult"
+        $FullShortcut.Description = "Plex AI Subtitler teljes vezerlopult"
         $FullShortcut.Save()
 
         if ($EnableAutostart) {
@@ -578,7 +686,6 @@ finally {
     Write-Host "Reszletes naplo: $InstallLog" -ForegroundColor Cyan
     Write-Host "Hardver riport:  $(Join-Path $LogsDir 'hardware_report.json')" -ForegroundColor Cyan
     try { Stop-Transcript | Out-Null } catch {}
-    # Masoljuk at a kesz telepitesi logot az 1.1\logs mappaba is, hogy a Hibacsomag (.zip) automatikusan megtalalja!
     try {
         Copy-Item -Path $InstallLog -Destination (Join-Path $ReleaseLogsDir (Split-Path -Leaf $InstallLog)) -Force
     } catch {}

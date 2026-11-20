@@ -132,4 +132,9 @@ def test_ultimate_installer_files_exist() -> None:
     assert "Microsoft.VCRedist" in ps_txt
     assert "Python.Python.3.12" in ps_txt
     assert "Gyan.FFmpeg" in ps_txt
+    assert "Tls12" in ps_txt
+    assert "WindowsApps" in ps_txt
+    assert "/VERYSILENT" in ps_txt
+    assert "download_model" in ps_txt
+    assert "OLLAMA_FLASH_ATTENTION" in ps_txt
     assert "--quick" in ps_txt
